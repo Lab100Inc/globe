@@ -1,0 +1,2291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Lab 100 Inc. — Global Network</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:           #000000;
+  --surface:      rgba(0, 8, 22, 0.97);
+  --cyan:         #00c8ff;
+  --cyan-dim:     rgba(0, 200, 255, 0.18);
+  --cyan-faint:   rgba(0, 200, 255, 0.05);
+  --white:        #ffffff;
+  --white-60:     rgba(255,255,255,0.6);
+  --white-30:     rgba(255,255,255,0.28);
+  --white-10:     rgba(255,255,255,0.07);
+  --border:       rgba(0, 200, 255, 0.14);
+  --border-light: rgba(0, 200, 255, 0.3);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: radial-gradient(ellipse at 50% 52%, #010d1e 0%, #000000 58%);
+  color: var(--white-60);
+  font-family: 'Inter', system-ui, sans-serif;
+  overflow: hidden;
+  height: 100vh; width: 100vw;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+/* perspective moved off body → lives only in ring keyframes to avoid iOS fixed-pos bugs */
+
+canvas {
+  display: block;
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 0;
+}
+
+/* ── ORBIT RINGS — tilted into 3D orbital planes ── */
+.orbit-ring {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 2;
+  top: 50%; left: 50%;
+  transform-style: preserve-3d;
+}
+.orbit-ring.r1 {
+  width: 630px; height: 630px;
+  border: 1px solid rgba(0,200,255,0.09);
+  animation: rspin1 80s linear infinite;
+}
+.orbit-ring.r2 {
+  width: 750px; height: 750px;
+  border: 1px solid rgba(0,200,255,0.05);
+  animation: rspin2 130s linear infinite reverse;
+}
+.orbit-ring::before {
+  content: '';
+  position: absolute;
+  top: -2px; left: 50%;
+  width: 1px; height: 5px;
+  background: var(--cyan);
+  opacity: 0.55;
+}
+@keyframes rspin1 {
+  from { transform: translate(-50%,-50%) perspective(1100px) rotateX(68deg) rotateZ(0deg); }
+  to   { transform: translate(-50%,-50%) perspective(1100px) rotateX(68deg) rotateZ(360deg); }
+}
+@keyframes rspin2 {
+  from { transform: translate(-50%,-50%) perspective(1100px) rotateX(55deg) rotateZ(0deg); }
+  to   { transform: translate(-50%,-50%) perspective(1100px) rotateX(55deg) rotateZ(360deg); }
+}
+
+/* ── VIGNETTE — depth darkening at screen edges ── */
+#vignette {
+  position: fixed; inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 50%,
+    transparent 28%,
+    rgba(0,0,0,0.38) 65%,
+    rgba(0,0,0,0.72) 100%
+  );
+}
+
+/* ── HEADER ── */
+#header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 52px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  padding-left: max(28px, env(safe-area-inset-left) + 16px);
+  padding-right: max(28px, env(safe-area-inset-right) + 16px);
+}
+
+#logo {
+  display: flex;
+  align-items: baseline;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+#logo .l1 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  color: var(--white);
+  text-transform: uppercase;
+}
+#logo .l2 {
+  font-size: 13px;
+  font-weight: 300;
+  letter-spacing: 2px;
+  color: var(--white);
+  text-transform: uppercase;
+  margin-left: 6px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+.h-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.h-val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px;
+  color: var(--white);
+  line-height: 1;
+}
+.h-lbl {
+  font-size: 7px;
+  letter-spacing: 2px;
+  color: var(--white-30);
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+.h-div {
+  width: 1px; height: 22px;
+  background: var(--border);
+}
+.h-status {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: var(--white-30);
+  text-transform: uppercase;
+}
+.h-status::before {
+  content: '';
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: #00e676;
+  box-shadow: 0 0 5px #00e676;
+  animation: blink 2.4s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+/* ── MOBILE HEADER ── */
+@media (max-width: 540px) {
+  #header { gap: 0; }
+  .header-right { gap: 12px; }
+  .h-div { display: none; }
+  .h-stat-cities { display: none; }
+  .h-status { display: none; }
+  .h-val { font-size: 11px; }
+  .h-lbl { font-size: 6px; letter-spacing: 1px; }
+  #logo .l1 { font-size: 13px; letter-spacing: 2px; }
+  #logo .l2 { font-size: 11px; letter-spacing: 1.5px; }
+}
+
+/* ── FOOTER ── */
+#footer {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 38px;
+  border-top: 1px solid var(--border);
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 max(28px, env(safe-area-inset-right) + 16px) 0 max(28px, env(safe-area-inset-left) + 16px);
+  pointer-events: none;
+}
+.f-text {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px;
+  color: var(--white-30);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* ── HINT ── */
+#hint {
+  position: fixed;
+  bottom: 64px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 3px;
+  color: rgba(0,200,255,0.28);
+  text-transform: uppercase;
+  pointer-events: none;
+  transition: opacity 1.2s;
+  white-space: nowrap;
+}
+
+/* ── CITY PANEL ── */
+#cityPanel {
+  position: fixed;
+  top: 52px; right: -440px;
+  width: 400px;
+  height: calc(100vh - 90px);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  z-index: 50;
+  transition: right 0.45s cubic-bezier(0.4,0,0.2,1);
+  overflow-y: auto; overflow-x: hidden;
+  padding: 26px 26px 40px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+#cityPanel::-webkit-scrollbar { width: 2px; }
+#cityPanel::-webkit-scrollbar-thumb { background: var(--border); }
+#cityPanel.open { right: 0; }
+#cityPanel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(to right, transparent, var(--cyan), transparent);
+  opacity: 0.45;
+}
+
+.p-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; }
+
+#closePanel {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--white-60);
+  width: 28px; height: 28px;
+  cursor: pointer; font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; font-family: inherit;
+  flex-shrink: 0;
+}
+#closePanel:hover { background: var(--white-10); border-color: var(--border-light); color: var(--white); }
+
+.p-node-id {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px; letter-spacing: 3px;
+  color: rgba(0,200,255,0.55);
+  text-transform: uppercase;
+  margin-bottom: 7px;
+}
+#panelCity {
+  font-size: 22px; font-weight: 600;
+  color: var(--white);
+  letter-spacing: 0.5px; line-height: 1.1;
+  margin-bottom: 2px;
+}
+#panelCountry {
+  font-size: 11px; font-weight: 400;
+  color: var(--white-30);
+  letter-spacing: 1px; margin-bottom: 8px;
+}
+#panelCoords {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: rgba(0,200,255,0.4);
+  letter-spacing: 1px;
+}
+
+.data-strip {
+  display: flex; gap: 10px;
+  margin: 16px 0;
+}
+.d-cell {
+  flex: 1;
+  background: var(--cyan-faint);
+  border: 1px solid var(--border);
+  padding: 9px 12px;
+}
+.d-lbl {
+  font-size: 7px; letter-spacing: 2px;
+  color: var(--white-30);
+  text-transform: uppercase; margin-bottom: 4px;
+}
+.d-val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 15px; color: var(--white);
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 16px 0;
+}
+.s-label {
+  font-size: 7px; letter-spacing: 3px;
+  color: var(--white-30);
+  text-transform: uppercase; margin-bottom: 9px;
+}
+
+.tag-row { display: flex; flex-wrap: wrap; gap: 5px; }
+.tag {
+  border: 1px solid var(--border);
+  color: var(--white-60);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 7px; letter-spacing: 1.5px;
+  padding: 4px 10px; text-transform: uppercase;
+  background: var(--cyan-faint);
+  transition: all 0.15s;
+}
+.tag:hover { border-color: var(--border-light); color: var(--white); }
+
+#pOverview {
+  font-size: 13px; color: var(--white-60);
+  line-height: 1.9; font-weight: 300;
+}
+
+.agent-card {
+  border: 1px solid var(--border);
+  background: var(--cyan-faint);
+  padding: 12px 14px;
+  margin-bottom: 6px;
+  display: flex; gap: 12px; align-items: flex-start;
+}
+.agent-av {
+  width: 30px; height: 30px;
+  border: 1px solid var(--border-light);
+  background: var(--cyan-dim);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; color: var(--cyan);
+  flex-shrink: 0;
+}
+.a-name {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px; font-weight: 400;
+  color: var(--white); letter-spacing: 1px;
+  text-transform: uppercase; margin-bottom: 2px;
+}
+.a-role {
+  font-size: 9px; color: var(--white-30);
+  letter-spacing: 1px; text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.a-avail {
+  display: flex; align-items: center; gap: 5px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px; color: #00e676;
+  letter-spacing: 1px; text-transform: uppercase;
+}
+.a-avail::before {
+  content: '';
+  width: 4px; height: 4px; border-radius: 50%;
+  background: #00e676; box-shadow: 0 0 4px #00e676;
+}
+
+/* ── TOOLTIP ── */
+#tooltip {
+  position: fixed; z-index: 40;
+  background: rgba(0,0,0,0.9);
+  border: 1px solid var(--border-light);
+  padding: 6px 12px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; letter-spacing: 2px;
+  color: var(--white); pointer-events: none;
+  opacity: 0; transition: opacity 0.1s;
+  white-space: nowrap; text-transform: uppercase;
+}
+.t-sub { color: var(--white-30); font-size: 8px; letter-spacing: 1px; margin-top: 2px; }
+#tooltip.show { opacity: 1; }
+
+body.pin-hover { cursor: crosshair; }
+
+/* ── BOOT OVERLAY ── */
+#bootOverlay {
+  position: fixed; inset: 0;
+  background: #000;
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 20px;
+  pointer-events: none;
+  transition: opacity 0.9s ease;
+}
+#bootOverlay.fade-out { opacity: 0; }
+.boot-logo {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 26px; font-weight: 400;
+  color: #fff; letter-spacing: 8px;
+  text-transform: uppercase;
+  opacity: 0; animation: bootFadeIn 0.5s 0.3s forwards;
+}
+.boot-sub {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px; letter-spacing: 4px;
+  color: rgba(0,200,255,0.5);
+  text-transform: uppercase;
+  opacity: 0; animation: bootFadeIn 0.5s 0.7s forwards;
+}
+.boot-bar {
+  width: 180px; height: 1px;
+  background: rgba(0,200,255,0.15);
+  position: relative; overflow: hidden;
+  opacity: 0; animation: bootFadeIn 0.3s 0.5s forwards;
+}
+.boot-bar::after {
+  content: '';
+  position: absolute; top: 0; left: 0;
+  height: 100%; width: 0;
+  background: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan);
+  animation: bootBar 1.5s 0.6s cubic-bezier(0.4,0,0.2,1) forwards;
+}
+@keyframes bootFadeIn { to { opacity: 1; } }
+@keyframes bootBar    { to { width: 100%; } }
+
+/* ── HUD CORNER BRACKETS ── */
+.hud-corner {
+  position: fixed;
+  width: 52px; height: 52px;
+  pointer-events: none;
+  z-index: 18;
+  opacity: 0;
+  animation: hudFadeIn 1.2s 2.8s ease forwards;
+}
+@keyframes hudFadeIn { to { opacity: 1; } }
+.hud-corner.tl { top: 60px; left: 10px;  border-top:    2px solid rgba(0,200,255,0.58); border-left:   2px solid rgba(0,200,255,0.58); }
+.hud-corner.tr { top: 60px; right: 10px; border-top:    2px solid rgba(0,200,255,0.58); border-right:  2px solid rgba(0,200,255,0.58); }
+.hud-corner.bl { bottom: 68px; left: 10px;  border-bottom: 2px solid rgba(0,200,255,0.58); border-left:   2px solid rgba(0,200,255,0.58); }
+.hud-corner.br { bottom: 68px; right: 10px; border-bottom: 2px solid rgba(0,200,255,0.58); border-right:  2px solid rgba(0,200,255,0.58); }
+
+/* ── TARGETING RETICLE ── */
+#reticle {
+  position: fixed;
+  width: 40px; height: 40px;
+  pointer-events: none;
+  z-index: 12;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.18s ease, width 0.2s ease, height 0.2s ease;
+}
+#reticle.show { opacity: 1; animation: reticlePulse 2s ease-in-out infinite; }
+#reticle.selected {
+  width: 52px; height: 52px;
+  opacity: 1;
+  animation: reticleSelected 2.2s ease-in-out infinite;
+}
+@keyframes reticlePulse {
+  0%, 100% { transform: translate(-50%,-50%) scale(1); }
+  50%       { transform: translate(-50%,-50%) scale(1.07); }
+}
+@keyframes reticleSelected {
+  0%, 100% { transform: translate(-50%,-50%) scale(1); }
+  50%       { transform: translate(-50%,-50%) scale(1.05); }
+}
+.rt { position: absolute; width: 12px; height: 12px; }
+.rt.tl { top:0; left:0; border-top: 1.5px solid var(--cyan); border-left: 1.5px solid var(--cyan); }
+.rt.tr { top:0; right:0; border-top: 1.5px solid var(--cyan); border-right: 1.5px solid var(--cyan); }
+.rt.bl { bottom:0; left:0; border-bottom: 1.5px solid var(--cyan); border-left: 1.5px solid var(--cyan); }
+.rt.br { bottom:0; right:0; border-bottom: 1.5px solid var(--cyan); border-right: 1.5px solid var(--cyan); }
+#reticle::after {
+  content: '';
+  position: absolute; top: 50%; left: 50%;
+  width: 3px; height: 3px;
+  border-radius: 50%;
+  background: var(--cyan);
+  transform: translate(-50%,-50%);
+  opacity: 0.75;
+  box-shadow: 0 0 5px var(--cyan);
+}
+#reticleLabel {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 7px;
+  letter-spacing: 2.5px;
+  color: var(--cyan);
+  white-space: nowrap;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+#reticle.selected #reticleLabel { opacity: 0.8; }
+
+/* ── DATA TICKER ── */
+#ticker {
+  position: fixed;
+  bottom: 38px; left: 0; right: 0;
+  height: 20px;
+  z-index: 19;
+  overflow: hidden;
+  border-top: 1px solid rgba(0,200,255,0.10);
+  background: rgba(0,0,5,0.45);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex; align-items: center;
+  opacity: 0;
+  animation: hudFadeIn 0.8s 3.2s ease forwards;
+}
+#tickerTrack {
+  white-space: nowrap;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 2.5px;
+  color: rgba(0,200,255,0.30);
+  text-transform: uppercase;
+  animation: tickerScroll 100s linear infinite;
+  will-change: transform;
+}
+@keyframes tickerScroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+@media (max-width: 640px) {
+  /* Ticker + HUD corners hidden on mobile */
+  #ticker { display: none; }
+  .hud-corner { display: none; }
+
+  /* Hint — allow wrap, lift above footer */
+  #hint {
+    bottom: 54px;
+    font-size: 7px;
+    letter-spacing: 2px;
+    white-space: normal;
+    text-align: center;
+    width: 72%;
+  }
+
+  /* Panel — full width, slides from right, proper safe-area padding */
+  #cityPanel {
+    width: 100%;
+    right: -100%;
+    top: 52px;
+    height: calc(100vh - 52px);
+    height: calc(100dvh - 52px);
+    border-left: none;
+    border-top: 1px solid var(--border);
+    padding: 20px max(20px, env(safe-area-inset-right) + 14px) 80px max(20px, env(safe-area-inset-left) + 14px);
+    padding-bottom: max(80px, env(safe-area-inset-bottom) + 60px);
+    -webkit-overflow-scrolling: touch;
+  }
+  #cityPanel.open { right: 0; }
+
+  /* Close button — 44px minimum tap target */
+  #closePanel { width: 44px; height: 44px; font-size: 14px; }
+
+  /* Orbit rings — scale down to not dominate small screens */
+  .orbit-ring.r1 { width: 440px; height: 440px; }
+  .orbit-ring.r2 { width: 520px; height: 520px; }
+}
+
+/* ── HEX OVERLAY ── */
+#hexCanvas {
+  position: fixed;
+  top: 0; left: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.045;
+}
+</style>
+</head>
+<body>
+
+<!-- Boot Overlay -->
+<div id="bootOverlay">
+  <div class="boot-logo">Lab 100</div>
+  <div class="boot-bar"></div>
+  <div class="boot-sub">Initializing Network</div>
+</div>
+
+<div class="orbit-ring r1"></div>
+<div class="orbit-ring r2"></div>
+
+<!-- Vignette depth overlay -->
+<div id="vignette"></div>
+
+<!-- HUD Corners -->
+<div class="hud-corner tl"></div>
+<div class="hud-corner tr"></div>
+<div class="hud-corner bl"></div>
+<div class="hud-corner br"></div>
+
+<!-- Targeting Reticle -->
+<div id="reticle">
+  <span class="rt tl"></span>
+  <span class="rt tr"></span>
+  <span class="rt bl"></span>
+  <span class="rt br"></span>
+  <div id="reticleLabel"></div>
+</div>
+
+<!-- Hex Grid Overlay -->
+<canvas id="hexCanvas"></canvas>
+
+<!-- Header -->
+<div id="header">
+  <div id="logo">
+    <span class="l1">Lab 100</span>
+    <span class="l2">Inc.</span>
+  </div>
+  <div class="header-right">
+    <div class="h-stat h-stat-cities">
+      <div class="h-val">100</div>
+      <div class="h-lbl">Cities</div>
+    </div>
+    <div class="h-div h-stat-cities"></div>
+    <div class="h-stat">
+      <div class="h-val" id="hLat" style="font-size:11px;letter-spacing:1px;">—</div>
+      <div class="h-lbl">Latitude</div>
+    </div>
+    <div class="h-div"></div>
+    <div class="h-stat">
+      <div class="h-val" id="hLon" style="font-size:11px;letter-spacing:1px;">—</div>
+      <div class="h-lbl">Longitude</div>
+    </div>
+    <div class="h-div"></div>
+    <div class="h-stat">
+      <div class="h-val" id="hTime">—</div>
+      <div class="h-lbl">UTC</div>
+    </div>
+    <div class="h-div"></div>
+    <div class="h-status">Network Active</div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div id="footer">
+  <span class="f-text">© 2026 Lab 100 Inc.</span>
+  <span class="f-text" id="fCoords">Drag to Explore · Scroll to Zoom</span>
+</div>
+
+<!-- Data Ticker -->
+<div id="ticker"><span id="tickerTrack"></span></div>
+
+<div id="hint">Select a node to open city dossier</div>
+
+<!-- City Panel -->
+<div id="cityPanel">
+  <div class="p-header">
+    <div>
+      <div class="p-node-id" id="panelId">// NODE</div>
+      <div id="panelCity">—</div>
+      <div id="panelCountry">—</div>
+      <div id="panelContinent" style="font-size:10px;letter-spacing:1.5px;color:var(--cyan);opacity:0.7;margin-bottom:4px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;">—</div>
+      <div id="panelCoords">—</div>
+    </div>
+    <button id="closePanel" onclick="closePanel()">✕</button>
+  </div>
+
+  <div class="data-strip">
+    <div class="d-cell">
+      <div class="d-lbl">Representatives</div>
+      <div class="d-val" id="pAgentN">—</div>
+    </div>
+    <div class="d-cell">
+      <div class="d-lbl">Sectors</div>
+      <div class="d-val" id="pIndN">—</div>
+    </div>
+    <div class="d-cell">
+      <div class="d-lbl">Local Time</div>
+      <div class="d-val" id="pLocalTime" style="font-size:13px;letter-spacing:1px;">—</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+  <div class="s-label">Sector Coverage</div>
+  <div class="tag-row" id="pIndustries"></div>
+
+  <div class="divider"></div>
+  <div class="s-label">Overview</div>
+  <div id="pOverview">—</div>
+
+  <div class="divider"></div>
+  <div class="s-label">Lab 100 Representatives</div>
+  <div id="pAgents"></div>
+</div>
+
+<div id="tooltip">
+  <div id="tCity"></div>
+  <div class="t-sub" id="tCountry"></div>
+</div>
+
+<!-- Three.js + TopoJSON -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════
+//  CITY DATA
+// ═══════════════════════════════════════════════════
+const CITIES = [
+  { name:"New York", country:"United States", lat:40.71, lon:-74.01,
+    industries:["Finance","Media","Technology","Fashion","Real Estate"],
+    overview:"The financial capital of the world. Home to Wall Street, NYSE, and NASDAQ. A nexus of global deal-making across every sector — from private equity to venture capital.",
+    agents:[{n:"V. CRANE",r:"Senior Deal Broker"},{n:"M. ATLAS",r:"Finance Liaison"},{n:"J. ROWAN",r:"Media & Tech Connector"}] },
+
+  { name:"London", country:"United Kingdom", lat:51.51, lon:-0.13,
+    industries:["Finance","Legal","Insurance","Luxury","FinTech"],
+    overview:"Europe's premier financial center. The City of London houses global banking institutions, Lloyd's of London, and the world's largest foreign exchange market.",
+    agents:[{n:"E. BLACKWELL",r:"Senior Partner"},{n:"H. SINCLAIR",r:"FinTech Connector"}] },
+
+  { name:"Tokyo", country:"Japan", lat:35.68, lon:139.69,
+    industries:["Technology","Automotive","Finance","Electronics","Robotics"],
+    overview:"Asia's most mature financial market and global hub for technology and manufacturing innovation. Gateway to Japan's $5 trillion economy.",
+    agents:[{n:"K. TANAKA",r:"Tech & Industry Broker"},{n:"R. MORI",r:"Finance Liaison"}] },
+
+  { name:"Singapore", country:"Singapore", lat:1.35, lon:103.82,
+    industries:["Finance","Shipping","Technology","Biotech","Commodities"],
+    overview:"The gateway to Southeast Asia. Premier hub for wealth management, commodity trading, and regional headquarters for countless multinationals.",
+    agents:[{n:"S. LIM",r:"Regional Director"},{n:"A. CHEN",r:"Commodities Broker"}] },
+
+  { name:"Hong Kong", country:"China SAR", lat:22.32, lon:114.17,
+    industries:["Finance","Trade","Real Estate","Shipping","Luxury"],
+    overview:"Asia's world city — a critical bridge between East and West. One of the most concentrated financial centers on earth with unparalleled trade flow.",
+    agents:[{n:"D. WONG",r:"Deal Connector"},{n:"L. MA",r:"Real Estate Liaison"}] },
+
+  { name:"Dubai", country:"UAE", lat:25.20, lon:55.27,
+    industries:["Real Estate","Finance","Luxury","Logistics","Tourism"],
+    overview:"The Middle East's global city. A tax-neutral ground for East-West deals and the world's busiest re-export hub by volume.",
+    agents:[{n:"F. AL-RASHID",r:"Regional Broker"},{n:"O. PETROV",r:"Luxury & Real Estate"}] },
+
+  { name:"Shanghai", country:"China", lat:31.23, lon:121.47,
+    industries:["Finance","Manufacturing","Trade","Technology","Automotive"],
+    overview:"China's financial powerhouse. The Pudong district rivals global financial centers, hosting the Shanghai Stock Exchange and major free trade zones.",
+    agents:[{n:"W. ZHANG",r:"China Market Specialist"},{n:"Y. LIU",r:"Manufacturing Connector"}] },
+
+  { name:"Paris", country:"France", lat:48.86, lon:2.35,
+    industries:["Luxury","Fashion","Finance","Aerospace","Tourism"],
+    overview:"The global capital of luxury and culture. Home to LVMH, Hermès, and Chanel headquarters. France's powerful aerospace and defense sector operates from here.",
+    agents:[{n:"C. BEAUMONT",r:"Luxury & Fashion Broker"},{n:"N. LECLAIR",r:"Finance Connector"}] },
+
+  { name:"Sydney", country:"Australia", lat:-33.87, lon:151.21,
+    industries:["Finance","Mining","Real Estate","Technology","Tourism"],
+    overview:"Australia's gateway to global markets. A major financial center with deep ties to the resources sector and Asia-Pacific trade networks.",
+    agents:[{n:"T. MORRISON",r:"APAC Deal Broker"},{n:"C. WALSH",r:"Resources Liaison"}] },
+
+  { name:"Toronto", country:"Canada", lat:43.65, lon:-79.38,
+    industries:["Finance","Real Estate","Mining","Technology","Media"],
+    overview:"Canada's financial capital. The TSX is a global hub for mining and resources financing. A rapidly growing tech sector competes with Silicon Valley.",
+    agents:[{n:"B. HAYES",r:"Senior Deal Connector"},{n:"P. STERLING",r:"Finance Liaison"}] },
+
+  { name:"Los Angeles", country:"United States", lat:34.05, lon:-118.24,
+    industries:["Entertainment","Technology","Real Estate","Fashion","Trade"],
+    overview:"The entertainment capital of the world with an expanding technology and trade sector. The Port of LA is the largest container port in the United States.",
+    agents:[{n:"A. VEGA",r:"Entertainment Broker"},{n:"M. CROSS",r:"Tech & Trade Connector"}] },
+
+  { name:"Chicago", country:"United States", lat:41.88, lon:-87.63,
+    industries:["Finance","Manufacturing","Agriculture","Logistics","Healthcare"],
+    overview:"The Midwest's financial capital. Home to the CME Group — the world's largest financial derivatives exchange where global commodity prices are determined.",
+    agents:[{n:"R. FROST",r:"Derivatives & Finance Broker"}] },
+
+  { name:"Frankfurt", country:"Germany", lat:50.11, lon:8.68,
+    industries:["Finance","Automotive","Pharma","Logistics","Publishing"],
+    overview:"The financial heart of continental Europe. Home to the European Central Bank and the Frankfurt Stock Exchange (Deutsche Börse).",
+    agents:[{n:"K. MÜLLER",r:"ECB Liaison"},{n:"S. BRAUN",r:"Industrial Broker"}] },
+
+  { name:"Zurich", country:"Switzerland", lat:47.38, lon:8.54,
+    industries:["Private Banking","Insurance","Pharma","Luxury","Technology"],
+    overview:"The global private banking capital. Zurich and Geneva collectively manage the world's largest share of cross-border private wealth.",
+    agents:[{n:"H. WEBER",r:"Private Banking Liaison"},{n:"A. FISCHER",r:"Wealth Connector"}] },
+
+  { name:"Seoul", country:"South Korea", lat:37.57, lon:126.98,
+    industries:["Technology","Electronics","Automotive","Entertainment","Shipbuilding"],
+    overview:"Home to Samsung, LG, and Hyundai. South Korea's economic engine and a global pop culture export powerhouse reshaping media worldwide.",
+    agents:[{n:"J. PARK",r:"Tech & Industry Broker"},{n:"S. KIM",r:"Entertainment Connector"}] },
+
+  { name:"Mumbai", country:"India", lat:19.08, lon:72.88,
+    industries:["Finance","Film","IT Services","Textiles","Pharma"],
+    overview:"India's financial and commercial capital. Dalal Street is Asia's oldest exchange. Gateway to 1.4 billion consumers and a rapidly expanding middle class.",
+    agents:[{n:"P. MEHTA",r:"India Market Director"},{n:"A. SHARMA",r:"Finance Liaison"}] },
+
+  { name:"São Paulo", country:"Brazil", lat:-23.55, lon:-46.63,
+    industries:["Finance","Agriculture","Energy","Manufacturing","Media"],
+    overview:"South America's largest business hub and Brazil's economic engine. Home to the B3 exchange and regional headquarters for multinationals across the continent.",
+    agents:[{n:"R. SANTOS",r:"LatAm Deal Broker"},{n:"C. FERREIRA",r:"Finance Connector"}] },
+
+  { name:"Mexico City", country:"Mexico", lat:19.43, lon:-99.13,
+    industries:["Manufacturing","Finance","Automotive","Aerospace","Energy"],
+    overview:"North America's most populous city. A nearshoring powerhouse benefiting from shifting global supply chains and deep US-Mexico trade integration.",
+    agents:[{n:"L. HERRERA",r:"Mexico Market Broker"},{n:"I. RUIZ",r:"Manufacturing Liaison"}] },
+
+  { name:"Amsterdam", country:"Netherlands", lat:52.37, lon:4.90,
+    industries:["Finance","Logistics","Technology","Semiconductors","Agriculture"],
+    overview:"A critical European tech and finance hub. Home to ASML, Booking.com, and Europe's primary cargo gateway serving the broader continent.",
+    agents:[{n:"J. DE VRIES",r:"Tech & Logistics Broker"},{n:"M. VAN DAM",r:"Finance Liaison"}] },
+
+  { name:"Stockholm", country:"Sweden", lat:59.33, lon:18.07,
+    industries:["Technology","FinTech","Gaming","Telecom","Clean Energy"],
+    overview:"Europe's most prolific startup hub per capita. Birthplace of Spotify, Klarna, and a thriving ecosystem of tech companies with outsized global footprints.",
+    agents:[{n:"L. ERIKSSON",r:"Startup & Tech Connector"},{n:"A. LINDQVIST",r:"FinTech Liaison"}] },
+
+  { name:"Johannesburg", country:"South Africa", lat:-26.20, lon:28.05,
+    industries:["Mining","Finance","Real Estate","Manufacturing","Retail"],
+    overview:"Africa's economic powerhouse. The JSE is the continent's largest stock exchange. Johannesburg is the primary deal center for sub-Saharan Africa.",
+    agents:[{n:"N. DLAMINI",r:"Africa Deal Broker"},{n:"T. MOLEFE",r:"Mining Liaison"}] },
+
+  { name:"Nairobi", country:"Kenya", lat:-1.29, lon:36.82,
+    industries:["Technology","Finance","Agriculture","Logistics","Tourism"],
+    overview:"East Africa's startup and fintech hub. Home to M-Pesa's mobile money platform. The Silicon Savannah is reshaping financial access continent-wide.",
+    agents:[{n:"A. KAMAU",r:"East Africa Connector"}] },
+
+  { name:"Lagos", country:"Nigeria", lat:6.52, lon:3.38,
+    industries:["Oil & Gas","Finance","Media","Real Estate","Entertainment"],
+    overview:"Africa's largest city and Nigeria's economic engine. A commerce powerhouse and center of Nollywood — the world's second-largest film industry by output.",
+    agents:[{n:"C. OKAFOR",r:"West Africa Deal Broker"},{n:"F. ADEYEMI",r:"Energy Liaison"}] },
+
+  { name:"Cairo", country:"Egypt", lat:30.04, lon:31.24,
+    industries:["Finance","Tourism","Real Estate","Energy","Construction"],
+    overview:"North Africa's largest city and the gateway between Africa and the Middle East. Egypt's energy sector and rapid urbanization attract significant sovereign investment.",
+    agents:[{n:"K. IBRAHIM",r:"MENA Connector"},{n:"S. HASSAN",r:"Real Estate Liaison"}] },
+
+  { name:"Riyadh", country:"Saudi Arabia", lat:24.71, lon:46.68,
+    industries:["Oil & Gas","Finance","Real Estate","Vision 2030","Defense"],
+    overview:"Capital of the world's largest oil exporter, undergoing massive Vision 2030 transformation. Sovereign wealth flows through PIF with $700B+ in assets under management.",
+    agents:[{n:"A. AL-SAUD",r:"Kingdom Liaison"},{n:"F. AL-DOSARI",r:"Energy Broker"}] },
+
+  { name:"Istanbul", country:"Turkey", lat:41.01, lon:28.98,
+    industries:["Trade","Finance","Real Estate","Tourism","Manufacturing"],
+    overview:"The crossroads of Europe and Asia. A massive manufacturing and logistics hub linking East-West trade routes — the historical terminus of the Silk Road.",
+    agents:[{n:"E. YILMAZ",r:"Eurasia Deal Broker"},{n:"M. KAYA",r:"Trade Connector"}] },
+
+  { name:"Tel Aviv", country:"Israel", lat:32.09, lon:34.78,
+    industries:["Technology","Cybersecurity","Venture Capital","Defense Tech","Biotech"],
+    overview:"The Startup Nation's capital. Tel Aviv has the highest startup density per capita globally and a world-class cybersecurity and deep technology ecosystem.",
+    agents:[{n:"D. COHEN",r:"Startup Ecosystem Broker"},{n:"R. LEVI",r:"Cyber & Defense Tech"}] },
+
+  { name:"Vienna", country:"Austria", lat:48.21, lon:16.37,
+    industries:["Finance","Tourism","Real Estate","OPEC HQ","Pharma"],
+    overview:"A sophisticated financial hub hosting OPEC headquarters. Gateway to Central and Eastern European markets with unmatched institutional stability.",
+    agents:[{n:"F. HOFMANN",r:"CEE Connector"},{n:"S. GRUBER",r:"Energy Policy Liaison"}] },
+
+  { name:"Brussels", country:"Belgium", lat:50.85, lon:4.35,
+    industries:["EU Policy","Institutions","Technology","Finance","Pharmaceuticals"],
+    overview:"The capital of the European Union. Where regulations are written, lobbied, and shaped — indispensable for any business operating across Europe.",
+    agents:[{n:"S. DUPONT",r:"EU Policy Broker"},{n:"A. LAMBERT",r:"Regulatory Liaison"}] },
+
+  { name:"Milan", country:"Italy", lat:45.47, lon:9.19,
+    industries:["Fashion","Luxury","Finance","Design","Manufacturing"],
+    overview:"The global capital of fashion and industrial design. Italy's financial center and home to the world's most prestigious luxury brand headquarters.",
+    agents:[{n:"G. FERRARI",r:"Fashion & Luxury Broker"},{n:"L. RICCI",r:"Finance Connector"}] },
+
+  { name:"Madrid", country:"Spain", lat:40.42, lon:-3.70,
+    industries:["Finance","Tourism","Real Estate","Infrastructure","Energy"],
+    overview:"Spain's economic capital and gateway to Latin America. Spanish banks and infrastructure firms lead LatAm markets — the bridge to 600M Spanish speakers.",
+    agents:[{n:"C. GARCIA",r:"Ibero-American Connector"},{n:"I. MARTIN",r:"Finance Liaison"}] },
+
+  { name:"Warsaw", country:"Poland", lat:52.23, lon:21.01,
+    industries:["Technology","Finance","Manufacturing","Logistics","BPO"],
+    overview:"Central Europe's fastest-growing economy. Warsaw is the de facto CEE headquarters for global corporations seeking the EU's most dynamic emerging market.",
+    agents:[{n:"P. KOWALSKI",r:"CEE Deal Broker"}] },
+
+  { name:"Moscow", country:"Russia", lat:55.76, lon:37.62,
+    industries:["Energy","Finance","Defense","Technology","Commodities"],
+    overview:"Russia's financial and political capital. A significant node in global commodity and energy markets navigating complex geopolitical dynamics.",
+    agents:[{n:"A. VOLKOV",r:"Commodities Liaison"}] },
+
+  { name:"Beijing", country:"China", lat:39.90, lon:116.41,
+    industries:["Technology","Finance","Government","Defense","Real Estate"],
+    overview:"China's political capital and tech powerhouse. Home to Baidu, ByteDance, and institutions driving trillion-dollar Belt and Road policy decisions.",
+    agents:[{n:"L. CHEN",r:"Government Relations Broker"},{n:"X. ZHAO",r:"Tech Connector"}] },
+
+  { name:"Shenzhen", country:"China", lat:22.54, lon:114.06,
+    industries:["Electronics","Manufacturing","Technology","Venture Capital","FinTech"],
+    overview:"China's Silicon Valley and the world's hardware capital. Home to Tencent and Huawei — a manufacturing ecosystem of unmatched scale and production speed.",
+    agents:[{n:"G. WANG",r:"Hardware & VC Broker"},{n:"N. XU",r:"Manufacturing Liaison"}] },
+
+  { name:"Taipei", country:"Taiwan", lat:25.03, lon:121.57,
+    industries:["Semiconductors","Electronics","Technology","Finance","Manufacturing"],
+    overview:"Home to TSMC, the world's most critical semiconductor manufacturer. Taiwan produces 90%+ of the most advanced chips — a cornerstone of the global digital economy.",
+    agents:[{n:"C. HUANG",r:"Semiconductor Liaison"},{n:"V. WU",r:"Tech Connector"}] },
+
+  { name:"Bangkok", country:"Thailand", lat:13.76, lon:100.50,
+    industries:["Tourism","Manufacturing","Real Estate","Automotive","Finance"],
+    overview:"Southeast Asia's deal-making hub and major manufacturing center. Thailand is a key node in global automotive supply chains and agricultural export networks.",
+    agents:[{n:"S. PATEL",r:"SEA Deal Broker"},{n:"A. TANAKA",r:"Manufacturing Liaison"}] },
+
+  { name:"Jakarta", country:"Indonesia", lat:-6.21, lon:106.85,
+    industries:["Finance","Commodities","Real Estate","Technology","Consumer Goods"],
+    overview:"Gateway to the world's 4th most populous nation. Indonesia's growing middle class and vast natural resources define it as a critical emerging market.",
+    agents:[{n:"R. SANTOSO",r:"Indonesia Market Connector"}] },
+
+  { name:"Kuala Lumpur", country:"Malaysia", lat:3.14, lon:101.69,
+    industries:["Finance","Oil & Gas","Technology","Islamic Finance","Manufacturing"],
+    overview:"A critical hub for Islamic finance and gateway to Malaysia's oil wealth. Strategic center for ASEAN business with strong multinational presence.",
+    agents:[{n:"A. RAHMAN",r:"Islamic Finance Broker"},{n:"C. GOH",r:"ASEAN Connector"}] },
+
+  { name:"Ho Chi Minh City", country:"Vietnam", lat:10.82, lon:106.63,
+    industries:["Manufacturing","Technology","Real Estate","Consumer Goods","Agriculture"],
+    overview:"Vietnam's fastest-growing economic engine. Manufacturing relocation from China has made Ho Chi Minh City the primary destination for Southeast Asian FDI.",
+    agents:[{n:"H. NGUYEN",r:"Vietnam Market Connector"}] },
+
+  { name:"Bangalore", country:"India", lat:12.97, lon:77.59,
+    industries:["Technology","IT Services","Biotech","Aerospace","Startups"],
+    overview:"India's Silicon Valley. The tech hub driving India's $250B IT services export industry, from established firms like Infosys to a new generation of unicorn startups.",
+    agents:[{n:"V. KRISHNAN",r:"IT & Startup Broker"},{n:"S. IYER",r:"Biotech Connector"}] },
+
+  { name:"Delhi", country:"India", lat:28.61, lon:77.21,
+    industries:["Government","Manufacturing","Real Estate","Retail","Education"],
+    overview:"India's capital and a major economic powerhouse. Essential for policy and regulatory navigation, and for accessing North India's 500M consumer market.",
+    agents:[{n:"A. GUPTA",r:"Government Relations Liaison"},{n:"D. BHATIA",r:"Policy Connector"}] },
+
+  { name:"Auckland", country:"New Zealand", lat:-36.85, lon:174.76,
+    industries:["Agriculture","Tourism","Technology","Finance","Real Estate"],
+    overview:"New Zealand's economic hub and Pacific gateway. A stable AAA-rated economy with world-leading agricultural exports and a growing technology sector.",
+    agents:[{n:"J. WILLIAMS",r:"Pacific Connector"}] },
+
+  { name:"Melbourne", country:"Australia", lat:-37.81, lon:144.96,
+    industries:["Finance","Education","Real Estate","Healthcare","Technology"],
+    overview:"Australia's second financial center — a vibrant hub for professional services, healthcare innovation, and a thriving knowledge economy.",
+    agents:[{n:"C. TAYLOR",r:"Australia Deal Broker"}] },
+
+  { name:"Buenos Aires", country:"Argentina", lat:-34.60, lon:-58.38,
+    industries:["Agriculture","Finance","Technology","Media","Manufacturing"],
+    overview:"South America's cultural capital and a key agricultural commodity hub. Argentina's technology sector produces global unicorns despite economic volatility.",
+    agents:[{n:"M. RODRIGUEZ",r:"Southern Cone Connector"}] },
+
+  { name:"Santiago", country:"Chile", lat:-33.45, lon:-70.67,
+    industries:["Mining","Finance","Renewable Energy","Agriculture","Retail"],
+    overview:"South America's most stable economy. Chile's copper dominance and renewable energy transition make it critical for the global green economy.",
+    agents:[{n:"F. TORRES",r:"Mining & Energy Broker"},{n:"P. VARGAS",r:"Finance Liaison"}] },
+
+  { name:"Bogotá", country:"Colombia", lat:4.71, lon:-74.07,
+    industries:["Finance","Energy","Agriculture","Technology","Retail"],
+    overview:"Colombia's economic heart and the Andes' largest business hub. A growing fintech ecosystem and gateway to the Andean market of 110M people.",
+    agents:[{n:"J. CASTRO",r:"Andean Connector"}] },
+
+  { name:"Lima", country:"Peru", lat:-12.05, lon:-77.04,
+    industries:["Mining","Finance","Agriculture","Construction","Consumer Goods"],
+    overview:"Gateway to the world's richest mining territories. Copper, gold, and silver flow through Lima's financial networks — critical for the energy transition.",
+    agents:[{n:"C. FLORES",r:"Mining & Finance Liaison"}] },
+
+  { name:"San Francisco", country:"United States", lat:37.77, lon:-122.42,
+    industries:["Technology","Venture Capital","Biotech","AI","Finance"],
+    overview:"The epicenter of global technology and venture capital. The Bay Area ecosystem generates more technology wealth than almost any nation on earth.",
+    agents:[{n:"K. CHEN",r:"VC & Tech Broker"},{n:"L. PARK",r:"AI & Biotech Connector"}] },
+
+  { name:"Seattle", country:"United States", lat:47.61, lon:-122.33,
+    industries:["Technology","E-Commerce","Aerospace","Cloud Computing","Logistics"],
+    overview:"Home to Amazon, Microsoft, and Boeing. The Pacific Northwest tech corridor increasingly rivals Silicon Valley in both talent density and capital deployment.",
+    agents:[{n:"D. HARRIS",r:"Cloud & E-Commerce Broker"}] },
+
+  { name:"Boston", country:"United States", lat:42.36, lon:-71.06,
+    industries:["Biotech","Finance","Education","Healthcare","Defense"],
+    overview:"The world's leading biotech cluster. The Boston-Cambridge corridor houses more biotech and pharmaceutical R&D than almost any region on the planet.",
+    agents:[{n:"S. O'BRIEN",r:"Biotech Deal Broker"},{n:"M. REED",r:"Life Sciences Connector"}] },
+
+  { name:"Miami", country:"United States", lat:25.76, lon:-80.19,
+    industries:["Finance","Real Estate","Trade","Luxury","Entertainment"],
+    overview:"The gateway between North America and Latin America. A growing financial hub attracting hedge funds, digital asset firms, and family offices.",
+    agents:[{n:"A. DIAZ",r:"Americas Connector"},{n:"M. SILVA",r:"LatAm Liaison"}] },
+
+  { name:"Houston", country:"United States", lat:29.76, lon:-95.37,
+    industries:["Energy","Aerospace","Healthcare","Engineering","Chemicals"],
+    overview:"The energy capital of the world. Houston's Energy Corridor houses more oil and gas headquarters than any other city — the nexus of global energy deal-making.",
+    agents:[{n:"R. WALKER",r:"Energy Deal Broker"},{n:"T. OKAFOR",r:"Chemicals Liaison"}] },
+
+  { name:"Vancouver", country:"Canada", lat:49.28, lon:-123.12,
+    industries:["Technology","Real Estate","Mining","Film","Sustainability"],
+    overview:"Canada's Pacific gateway with deep Asia-Pacific ties. A booming clean energy sector and significant magnet for Asian capital and skilled immigration.",
+    agents:[{n:"T. LEE",r:"Pacific & Mining Connector"}] },
+
+  { name:"Casablanca", country:"Morocco", lat:33.57, lon:-7.59,
+    industries:["Finance","Trade","Real Estate","Tourism","Phosphates"],
+    overview:"Africa's Atlantic gateway and the critical financial hub for French-speaking Africa. Casablanca Finance City functions as a pan-African investment platform.",
+    agents:[{n:"Y. BENALI",r:"Francophone Africa Broker"}] },
+
+  { name:"Doha", country:"Qatar", lat:25.29, lon:51.53,
+    industries:["LNG","Finance","Real Estate","Sports","Infrastructure"],
+    overview:"Home to the world's largest LNG reserves per capita. Qatar's QIA sovereign wealth fund is one of the world's most active global institutional investors.",
+    agents:[{n:"M. AL-THANI",r:"Qatar & LNG Liaison"},{n:"F. AL-KUWARI",r:"SWF Connector"}] },
+
+  { name:"Abu Dhabi", country:"UAE", lat:24.45, lon:54.38,
+    industries:["Oil & Gas","Sovereign Wealth","Real Estate","Finance","Culture"],
+    overview:"Home to ADNOC and ADIA — one of the world's largest sovereign wealth funds managing over $1 trillion. The capital of Gulf institutional investment power.",
+    agents:[{n:"S. AL-MANSOORI",r:"Sovereign Wealth Broker"}] },
+
+  { name:"Muscat", country:"Oman", lat:23.59, lon:58.38,
+    industries:["Oil & Gas","Tourism","Logistics","Real Estate","Fisheries"],
+    overview:"Oman's capital and an increasingly strategic logistics hub at the entrance to the Persian Gulf, positioned as a neutral and stable GCC business gateway.",
+    agents:[{n:"H. AL-BALUSHI",r:"Gulf Connector"}] },
+
+  { name:"Amman", country:"Jordan", lat:31.96, lon:35.95,
+    industries:["Technology","Finance","Real Estate","Tourism","Pharma"],
+    overview:"A stable hub in a turbulent region. Amman is the preferred base for Levant operations and a growing technology ecosystem serving the broader Arab world.",
+    agents:[{n:"R. HADDAD",r:"Levant Connector"}] },
+
+  { name:"Baku", country:"Azerbaijan", lat:40.41, lon:49.87,
+    industries:["Oil & Gas","Finance","Real Estate","Technology","Agriculture"],
+    overview:"The Caspian energy hub. Azerbaijan's position on the New Silk Road makes Baku a growing transshipment corridor and investment center.",
+    agents:[{n:"E. ALIYEV",r:"Caspian Corridor Broker"}] },
+
+  { name:"Copenhagen", country:"Denmark", lat:55.68, lon:12.57,
+    industries:["Clean Energy","Shipping","Pharma","Design","Finance"],
+    overview:"A global leader in sustainable business. Home to Maersk (world's largest shipping firm) and Novo Nordisk — the sustainability capital of global commerce.",
+    agents:[{n:"C. JENSEN",r:"Sustainability & Shipping Broker"}] },
+
+  { name:"Oslo", country:"Norway", lat:59.91, lon:10.75,
+    industries:["Oil & Gas","Sovereign Wealth","Shipping","Clean Energy","Aquaculture"],
+    overview:"Home to the world's largest sovereign wealth fund (GPFG) with $1.7T+ in assets under management. Norway's oil revenues underwrite a global investment empire.",
+    agents:[{n:"L. BERG",r:"Sovereign Wealth Liaison"}] },
+
+  { name:"Helsinki", country:"Finland", lat:60.17, lon:24.94,
+    industries:["Technology","Design","Gaming","Clean Tech","Maritime"],
+    overview:"Finland's vibrant startup scene produced Nokia, Rovio, and Supercell. A Nordic hub for gaming technology, clean tech, and design-driven innovation.",
+    agents:[{n:"M. MÄKINEN",r:"Nordic Tech Connector"}] },
+
+  { name:"Dublin", country:"Ireland", lat:53.35, lon:-6.26,
+    industries:["Technology","Finance","Pharma","FinTech","Data Centers"],
+    overview:"European headquarters for Apple, Google, Meta, and countless tech giants. Ireland's corporate tax policy and English-speaking workforce make it the EU's tech capital.",
+    agents:[{n:"P. O'SULLIVAN",r:"EU Tech HQ Broker"},{n:"C. MURPHY",r:"Tax & Finance Liaison"}] },
+
+  { name:"Prague", country:"Czech Republic", lat:50.08, lon:14.44,
+    industries:["Technology","Manufacturing","Tourism","Automotive","Finance"],
+    overview:"Central Europe's technology and culture capital. A hub for BPO, SSC, and IT development attracting global enterprise shared services operations.",
+    agents:[{n:"J. NOVÁK",r:"CEE Connector"}] },
+
+  { name:"Athens", country:"Greece", lat:37.98, lon:23.73,
+    industries:["Shipping","Tourism","Real Estate","Finance","Energy"],
+    overview:"The global center for shipping. Greek shipowners control the world's largest merchant fleet, with Piraeus as the busiest port in the Mediterranean.",
+    agents:[{n:"N. PAPADOPOULOS",r:"Shipping & Maritime Broker"}] },
+
+  { name:"Guangzhou", country:"China", lat:23.13, lon:113.26,
+    industries:["Manufacturing","Trade","Automotive","Electronics","Textiles"],
+    overview:"China's trade capital and Southern gateway. The Canton Fair is the world's largest trade show — the primary meeting point for global buyers and Chinese manufacturers.",
+    agents:[{n:"H. LI",r:"China Trade Broker"},{n:"Q. PENG",r:"Manufacturing Connector"}] },
+
+  { name:"Chengdu", country:"China", lat:30.57, lon:104.07,
+    industries:["Technology","Aerospace","Electronics","Finance","Consumer Goods"],
+    overview:"Western China's economic capital and a fast-emerging technology hub. Intel, Foxconn, and Dell have major operations here in China's rising interior economy.",
+    agents:[{n:"P. CHEN",r:"Western China Connector"}] },
+
+  { name:"Manila", country:"Philippines", lat:14.60, lon:120.98,
+    industries:["BPO","Remittances","Real Estate","Retail","Technology"],
+    overview:"The BPO capital of Asia. The Philippines outsourcing industry serves global corporations across finance, healthcare, and customer service at significant scale.",
+    agents:[{n:"M. REYES",r:"BPO & Services Broker"}] },
+
+  { name:"Karachi", country:"Pakistan", lat:24.86, lon:67.00,
+    industries:["Finance","Textiles","Manufacturing","Shipping","Consumer Goods"],
+    overview:"Pakistan's economic engine, responsible for the bulk of the country's industrial output, trade, and financial activity. Port city to 240M people.",
+    agents:[{n:"A. KHAN",r:"Pakistan Market Connector"}] },
+
+  { name:"Cape Town", country:"South Africa", lat:-33.93, lon:18.42,
+    industries:["Finance","Technology","Tourism","Agriculture","Film"],
+    overview:"South Africa's second business hub and a growing technology outsourcing destination. Cape Town's startup scene is among Africa's most vibrant.",
+    agents:[{n:"Z. BOTHA",r:"Southern Africa Connector"}] },
+
+  { name:"Addis Ababa", country:"Ethiopia", lat:9.03, lon:38.75,
+    industries:["Aviation","Agriculture","Finance","Real Estate","Government"],
+    overview:"The African Union's headquarters and a critical aviation hub. Ethiopian Airlines makes Addis Ababa one of Africa's most connected cities to the global network.",
+    agents:[{n:"H. TEKLE",r:"East Africa Liaison"}] },
+
+  { name:"Dar es Salaam", country:"Tanzania", lat:-6.79, lon:39.21,
+    industries:["Port & Logistics","Tourism","Agriculture","Mining","Real Estate"],
+    overview:"East Africa's largest port and gateway to landlocked Central Africa. Tanzania's extractive resources sector is attracting rapidly growing foreign direct investment.",
+    agents:[{n:"J. MWAMBA",r:"Central Africa Connector"}] },
+
+  { name:"Accra", country:"Ghana", lat:5.60, lon:-0.19,
+    industries:["Finance","Oil & Gas","Technology","Agriculture","Gold"],
+    overview:"West Africa's most stable democracy and an emerging financial hub. Ghana's gold and oil wealth fuels a growing professional and technology services sector.",
+    agents:[{n:"K. MENSAH",r:"Ghana & West Africa Broker"}] },
+
+  { name:"Lisbon", country:"Portugal", lat:38.72, lon:-9.14,
+    industries:["Technology","Tourism","Finance","Real Estate","Renewable Energy"],
+    overview:"Europe's most accessible technology hub. Lisbon hosts the Web Summit — Europe's largest technology conference — cementing its role as a startup ecosystem center.",
+    agents:[{n:"P. SILVA",r:"Euro-Atlantic Connector"}] },
+
+  { name:"Barcelona", country:"Spain", lat:41.39, lon:2.17,
+    industries:["Technology","Tourism","Real Estate","Fashion","Logistics"],
+    overview:"Spain's technology and innovation hub. Mobile World Congress makes Barcelona the annual global gathering point for the telecoms and mobile technology industry.",
+    agents:[{n:"J. PUIG",r:"Mobile & Tech Broker"}] },
+
+  { name:"Budapest", country:"Hungary", lat:47.50, lon:19.04,
+    industries:["Technology","Manufacturing","Tourism","Finance","BPO"],
+    overview:"A growing Central European business hub with a strong financial services, technology outsourcing, and automotive manufacturing sector.",
+    agents:[{n:"A. NAGY",r:"CEE Finance Connector"}] },
+
+  { name:"Beirut", country:"Lebanon", lat:33.89, lon:35.50,
+    industries:["Finance","Banking","Real Estate","Tourism","Trade"],
+    overview:"Historically the banking capital of the Arab world. Beirut's diaspora network and financial expertise remain globally influential despite structural headwinds.",
+    agents:[{n:"G. KHOURY",r:"Levant & Diaspora Broker"}] },
+
+  { name:"Tashkent", country:"Uzbekistan", lat:41.30, lon:69.24,
+    industries:["Energy","Agriculture","Mining","Manufacturing","Trade"],
+    overview:"The heart of Central Asia. Tashkent sits on the New Silk Road — gateway to a region rich in natural resources and rapidly expanding consumer markets.",
+    agents:[{n:"B. YUSUPOV",r:"Central Asia Connector"}] },
+
+  { name:"Colombo", country:"Sri Lanka", lat:6.93, lon:79.86,
+    industries:["Port & Logistics","Apparel","Tourism","Finance","IT Services"],
+    overview:"Sri Lanka's maritime capital and a key Asian transshipment port. The Colombo Port City project is emerging as a new Indian Ocean regional financial center.",
+    agents:[{n:"K. FERNANDO",r:"Indian Ocean Hub Broker"}] },
+
+  { name:"Abuja", country:"Nigeria", lat:9.08, lon:7.40,
+    industries:["Government","Real Estate","Finance","Construction","Policy"],
+    overview:"Nigeria's political capital. Critical for navigating the regulatory environment of Africa's largest economy, major oil exporter, and most populous nation.",
+    agents:[{n:"E. OKONKWO",r:"Government Relations Broker"}] },
+
+  { name:"Dallas", country:"United States", lat:32.78, lon:-96.80,
+    industries:["Finance","Real Estate","Energy","Healthcare","Technology"],
+    overview:"The fastest-growing major US metro, attracting corporate relocations at scale. A major Fortune 500 headquarters hub with a business-friendly regulatory environment.",
+    agents:[{n:"B. THOMPSON",r:"Corporate Relocation Broker"}] },
+
+  { name:"Atlanta", country:"United States", lat:33.75, lon:-84.39,
+    industries:["Logistics","Finance","Media","Technology","Retail"],
+    overview:"The US Southeast's logistics capital. Home to the world's busiest airport and the headquarters of Delta Air Lines, CNN, and Coca-Cola.",
+    agents:[{n:"V. JACKSON",r:"Southeast Hub Connector"}] },
+
+  { name:"Washington DC", country:"United States", lat:38.91, lon:-77.04,
+    industries:["Government","Defense","Policy","Consulting","Technology"],
+    overview:"The center of US policy, regulation, and government contracting. Essential for any business navigating federal relationships, defense procurement, or regulatory affairs.",
+    agents:[{n:"W. GRANT",r:"Government Relations Broker"},{n:"C. ADAMS",r:"Defense & Policy Liaison"}] },
+
+  { name:"Denver", country:"United States", lat:39.74, lon:-104.99,
+    industries:["Technology","Energy","Aerospace","Finance","Clean Energy"],
+    overview:"The gateway to the American West. A booming technology, aerospace, and clean energy sector makes Denver the rising business capital of the Mountain West.",
+    agents:[{n:"M. RIVERS",r:"Mountain West Connector"}] },
+
+  { name:"Montreal", country:"Canada", lat:45.50, lon:-73.57,
+    industries:["Aerospace","AI","Finance","Gaming","Pharma"],
+    overview:"Canada's AI and aerospace capital. Montreal hosts Airbus operations, Ubisoft headquarters, and world-leading AI research at MILA — the Quebec AI Institute.",
+    agents:[{n:"S. TREMBLAY",r:"AI & Aerospace Broker"}] },
+
+  { name:"Medellín", country:"Colombia", lat:6.24, lon:-75.58,
+    industries:["Technology","Textiles","Real Estate","Innovation","Tourism"],
+    overview:"Colombia's most innovative city. Transformed into a global model of urban innovation — a technology entrepreneurship hub attracting international investment and talent.",
+    agents:[{n:"A. ARBELAEZ",r:"Innovation Hub Connector"}] },
+
+  { name:"Panama City", country:"Panama", lat:8.99, lon:-79.52,
+    industries:["Finance","Logistics","Trade","Real Estate","Tourism"],
+    overview:"The crossroads of the Americas. Panama's canal and financial center make it the critical logistics and banking hub for the Western Hemisphere.",
+    agents:[{n:"R. SOLIS",r:"Americas Hub Broker"}] },
+
+  { name:"Guadalajara", country:"Mexico", lat:20.66, lon:-103.35,
+    industries:["Technology","Manufacturing","Electronics","Retail","Healthcare"],
+    overview:"Mexico's technology valley. IBM, HP, Oracle, and Intel all have major operations alongside a vibrant startup and nearshoring ecosystem.",
+    agents:[{n:"C. REYES",r:"Mexico Tech Connector"}] },
+
+  { name:"Perth", country:"Australia", lat:-31.95, lon:115.86,
+    industries:["Mining","Energy","Agriculture","Real Estate","Technology"],
+    overview:"Australia's mining capital. Perth's proximity to Asia makes it a vital node in global resources trade, particularly for iron ore and liquefied natural gas.",
+    agents:[{n:"R. NGUYEN",r:"Resources & Mining Broker"}] },
+
+  { name:"Monterrey", country:"Mexico", lat:25.69, lon:-100.32,
+    industries:["Manufacturing","Steel","Finance","Automotive","Energy"],
+    overview:"Mexico's industrial capital and a nearshoring powerhouse. Border proximity to Texas drives massive cross-border manufacturing and bilateral trade flow.",
+    agents:[{n:"H. GONZALEZ",r:"Industrial & Manufacturing Broker"}] },
+
+  { name:"Lusaka", country:"Zambia", lat:-15.39, lon:28.32,
+    industries:["Mining","Agriculture","Finance","Real Estate","Logistics"],
+    overview:"Gateway to the Copperbelt — one of the world's richest copper and cobalt mining regions. A critical node in the EV and battery supply chain transition.",
+    agents:[{n:"M. BANDA",r:"Copperbelt Resources Broker"}] },
+
+  { name:"Harare", country:"Zimbabwe", lat:-17.83, lon:31.05,
+    industries:["Mining","Agriculture","Finance","Tobacco","Technology"],
+    overview:"Zimbabwe's capital and gateway to significant platinum, gold, and lithium reserves. An emerging market with substantial untapped natural resource potential.",
+    agents:[{n:"T. NCUBE",r:"Zimbabwe Market Connector"}] },
+
+  { name:"Caracas", country:"Venezuela", lat:10.48, lon:-66.90,
+    industries:["Oil & Gas","Finance","Mining","Agriculture","Logistics"],
+    overview:"Venezuela holds the world's largest proven oil reserves. Despite structural challenges, Caracas remains a strategic focal point for energy sector positioning.",
+    agents:[{n:"P. MORALES",r:"Energy Sector Liaison"}] },
+
+  { name:"Quito", country:"Ecuador", lat:-0.18, lon:-78.47,
+    industries:["Oil & Gas","Agriculture","Mining","Tourism","Finance"],
+    overview:"Ecuador's capital and gateway to Amazon basin oil reserves. The dollarized economy offers institutional stability and accessibility for international investment.",
+    agents:[{n:"V. LARA",r:"Andean Resources Connector"}] },
+
+  { name:"Dhaka", country:"Bangladesh", lat:23.81, lon:90.41,
+    industries:["Garments","Manufacturing","Finance","Technology","Infrastructure"],
+    overview:"The garment manufacturing capital of the world. Bangladesh produces clothing for virtually every major global fashion brand at extraordinary scale.",
+    agents:[{n:"R. ISLAM",r:"Garment & Manufacturing Broker"}] },
+
+  { name:"Bucharest", country:"Romania", lat:44.43, lon:26.10,
+    industries:["Technology","Finance","Manufacturing","Real Estate","BPO"],
+    overview:"Romania's booming capital and fastest-growing EU technology hub. A leading destination for tech outsourcing and IT talent — Central Europe's digital backbone.",
+    agents:[{n:"M. IONESCU",r:"Romania & SEE Connector"}] },
+
+  { name:"Almaty", country:"Kazakhstan", lat:43.24, lon:76.89,
+    industries:["Finance","Energy","Mining","Real Estate","Trade"],
+    overview:"Central Asia's financial capital. Kazakhstan's vast energy and mineral wealth flows through Almaty's markets. The AIFC positions it as a global finance hub.",
+    agents:[{n:"D. SEITKALI",r:"Central Asia Finance Broker"}] },
+
+  { name:"Phnom Penh", country:"Cambodia", lat:11.56, lon:104.92,
+    industries:["Manufacturing","Tourism","Real Estate","Finance","Agriculture"],
+    overview:"Cambodia's rapidly developing capital. A growing garment and electronics manufacturing hub benefiting from South-South investment and ASEAN market integration.",
+    agents:[{n:"S. PRUM",r:"Mekong Region Connector"}] },
+
+  { name:"Tbilisi", country:"Georgia", lat:41.69, lon:44.83,
+    industries:["Finance","Technology","Tourism","Logistics","Energy Transit"],
+    overview:"The Caucasus' most open economy and a fast-growing fintech hub. Georgia's strategic position between Europe and Asia attracts global capital seeking stable ground.",
+    agents:[{n:"G. BERIDZE",r:"Caucasus & Silk Road Broker"}] },
+];
+
+// ── Accurate UTC offsets per city (decimal = half-hour zone, e.g. 5.5 = UTC+5:30) ──
+const CITY_TZ = {
+  // North America
+  "New York":-5,"Los Angeles":-8,"Chicago":-6,"San Francisco":-8,"Seattle":-8,
+  "Boston":-5,"Miami":-5,"Houston":-6,"Dallas":-6,"Atlanta":-5,
+  "Washington DC":-5,"Denver":-7,"Toronto":-5,"Vancouver":-8,"Montreal":-5,
+  "Mexico City":-6,"Guadalajara":-6,"Monterrey":-6,
+  // Central & South America
+  "Panama City":-5,"São Paulo":-3,"Buenos Aires":-3,"Santiago":-4,
+  "Bogotá":-5,"Lima":-5,"Medellín":-5,"Caracas":-4,"Quito":-5,
+  // Europe
+  "London":0,"Paris":1,"Frankfurt":1,"Zurich":1,"Amsterdam":1,"Stockholm":1,
+  "Milan":1,"Madrid":1,"Warsaw":1,"Brussels":1,"Vienna":1,"Copenhagen":1,
+  "Oslo":1,"Helsinki":2,"Dublin":0,"Prague":1,"Athens":2,"Lisbon":0,
+  "Barcelona":1,"Budapest":1,"Moscow":3,"Bucharest":2,"Istanbul":3,
+  // Middle East
+  "Dubai":4,"Riyadh":3,"Doha":3,"Abu Dhabi":4,"Muscat":4,
+  "Amman":3,"Beirut":2,"Tel Aviv":2,
+  // Africa
+  "Cairo":2,"Johannesburg":2,"Nairobi":3,"Lagos":1,"Casablanca":1,
+  "Addis Ababa":3,"Dar es Salaam":3,"Accra":0,"Cape Town":2,
+  "Abuja":1,"Lusaka":2,"Harare":2,
+  // Asia
+  "Tokyo":9,"Singapore":8,"Hong Kong":8,"Shanghai":8,"Seoul":9,
+  "Bangkok":7,"Jakarta":7,"Kuala Lumpur":8,"Ho Chi Minh City":7,
+  "Bangalore":5.5,"Delhi":5.5,"Mumbai":5.5,"Taipei":8,
+  "Beijing":8,"Shenzhen":8,"Guangzhou":8,"Chengdu":8,"Manila":8,
+  "Karachi":5,"Colombo":5.5,"Dhaka":6,"Phnom Penh":7,
+  "Tashkent":5,"Almaty":5,"Tbilisi":4,"Baku":4,
+  // Oceania
+  "Sydney":10,"Melbourne":10,"Perth":8,"Auckland":12,
+};
+
+// ── Continent lookup ──
+const CONTINENT = {
+  "New York":"North America","Los Angeles":"North America","Chicago":"North America",
+  "San Francisco":"North America","Seattle":"North America","Boston":"North America",
+  "Miami":"North America","Houston":"North America","Dallas":"North America",
+  "Atlanta":"North America","Washington DC":"North America","Denver":"North America",
+  "Toronto":"North America","Vancouver":"North America","Montreal":"North America",
+  "Mexico City":"North America","Guadalajara":"North America","Monterrey":"North America",
+  "Panama City":"Central America",
+  "São Paulo":"South America","Buenos Aires":"South America","Santiago":"South America",
+  "Bogotá":"South America","Lima":"South America","Medellín":"South America",
+  "Caracas":"South America","Quito":"South America",
+  "London":"Europe","Paris":"Europe","Frankfurt":"Europe","Zurich":"Europe",
+  "Amsterdam":"Europe","Stockholm":"Europe","Milan":"Europe","Madrid":"Europe",
+  "Warsaw":"Europe","Brussels":"Europe","Vienna":"Europe","Copenhagen":"Europe",
+  "Oslo":"Europe","Helsinki":"Europe","Dublin":"Europe","Prague":"Europe",
+  "Athens":"Europe","Lisbon":"Europe","Barcelona":"Europe","Budapest":"Europe",
+  "Moscow":"Europe","Bucharest":"Europe","Istanbul":"Europe",
+  "Tokyo":"Asia","Singapore":"Asia","Hong Kong":"Asia","Shanghai":"Asia",
+  "Seoul":"Asia","Bangkok":"Asia","Jakarta":"Asia","Kuala Lumpur":"Asia",
+  "Ho Chi Minh City":"Asia","Bangalore":"Asia","Delhi":"Asia","Taipei":"Asia",
+  "Beijing":"Asia","Shenzhen":"Asia","Guangzhou":"Asia","Chengdu":"Asia",
+  "Manila":"Asia","Karachi":"Asia","Colombo":"Asia","Dhaka":"Asia",
+  "Phnom Penh":"Asia","Tashkent":"Asia","Almaty":"Asia","Tbilisi":"Asia","Baku":"Asia",
+  "Dubai":"Middle East","Riyadh":"Middle East","Doha":"Middle East",
+  "Abu Dhabi":"Middle East","Muscat":"Middle East","Amman":"Middle East",
+  "Beirut":"Middle East","Tel Aviv":"Middle East",
+  "Cairo":"Africa","Johannesburg":"Africa","Nairobi":"Africa","Lagos":"Africa",
+  "Casablanca":"Africa","Addis Ababa":"Africa","Dar es Salaam":"Africa",
+  "Accra":"Africa","Cape Town":"Africa","Abuja":"Africa","Lusaka":"Africa","Harare":"Africa",
+  "Sydney":"Oceania","Melbourne":"Oceania","Perth":"Oceania","Auckland":"Oceania",
+};
+
+// ═══════════════════════════════════════════════════
+//  THREE.JS SETUP
+// ═══════════════════════════════════════════════════
+const GLOBE_R = 5;
+const canvas = document.createElement('canvas');
+document.body.insertBefore(canvas, document.body.firstChild);
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x000000, 1);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.z = window.innerWidth < 540 ? 22 : 16;
+
+// Lighting — soft, even, no harsh specular ball
+scene.add(new THREE.AmbientLight(0x0d2040, 8.0));
+const key = new THREE.DirectionalLight(0x88b8cc, 0.55); // dimmer — kills the specular blob
+key.position.set(6, 5, 8);
+scene.add(key);
+const fill = new THREE.DirectionalLight(0x0a2030, 0.5);
+fill.position.set(-8, -4, -6);
+scene.add(fill);
+// Cyan rim light from behind — creates atmospheric edge glow
+const rimLight = new THREE.DirectionalLight(0x006699, 0.40);
+rimLight.position.set(-5, 1, -10);
+scene.add(rimLight);
+
+// Globe group (all globe elements rotate together)
+const G = new THREE.Group();
+scene.add(G);
+
+// Base sphere — texture applied once map data loads
+const globeMat = new THREE.MeshPhongMaterial({
+  color: 0xffffff,
+  emissive: 0x030f1c,
+  emissiveIntensity: 1.35,
+  specular: 0x071525,  // near-black specular — no more glowing blob
+  shininess: 48,
+});
+const globeMesh = new THREE.Mesh(new THREE.SphereGeometry(GLOBE_R, 72, 72), globeMat);
+G.add(globeMesh);
+
+// ── Lat / Lon grid ──
+function buildGrid() {
+  const SEG = 120;
+  function lm(opacity) {
+    return new THREE.LineBasicMaterial({ color:0x00c8ff, transparent:true, opacity });
+  }
+  for (let lat = -75; lat <= 75; lat += 15) {
+    if (Math.abs(lat) === 75) continue; // skip near-pole circles — too small, clutters poles
+    const r = GLOBE_R * Math.cos(lat * Math.PI/180) + 0.002;
+    const y = GLOBE_R * Math.sin(lat * Math.PI/180);
+    const pts = [];
+    for (let i = 0; i <= SEG; i++) {
+      const a = i/SEG * Math.PI*2;
+      pts.push(new THREE.Vector3(r*Math.cos(a), y, r*Math.sin(a)));
+    }
+    const op = lat === 0 ? 0.25 : 0.06;
+    G.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lm(op)));
+  }
+  for (let lon = 0; lon < 360; lon += 15) {
+    const t = lon * Math.PI/180;
+    const pts = [];
+    for (let i = 0; i <= SEG; i++) {
+      const p = i/SEG * Math.PI*2;
+      pts.push(new THREE.Vector3(
+        GLOBE_R*Math.sin(p)*Math.cos(t)+0.002,
+        GLOBE_R*Math.cos(p),
+        GLOBE_R*Math.sin(p)*Math.sin(t)
+      ));
+    }
+    const op = (lon===0||lon===180) ? 0.25 : 0.06;
+    G.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lm(op)));
+  }
+}
+buildGrid();
+
+// ── Atmosphere — rim-only glow, no face-wash ──
+// FrontSide: extremely faint haze over visible face — barely perceptible
+const atmoRim = new THREE.Mesh(new THREE.SphereGeometry(GLOBE_R+0.10,64,64),
+  new THREE.MeshBasicMaterial({color:0x00aaff,transparent:true,opacity:0.022,side:THREE.FrontSide,depthWrite:false}));
+scene.add(atmoRim);
+// Inner BackSide — tight edge glow (most visible atmosphere layer)
+const atmoInner = new THREE.Mesh(new THREE.SphereGeometry(GLOBE_R+0.44,64,64),
+  new THREE.MeshBasicMaterial({color:0x0088dd,transparent:true,opacity:0.17,side:THREE.BackSide,depthWrite:false}));
+scene.add(atmoInner);
+// Mid corona
+const atmoMid = new THREE.Mesh(new THREE.SphereGeometry(GLOBE_R+1.0,64,64),
+  new THREE.MeshBasicMaterial({color:0x0055bb,transparent:true,opacity:0.115,side:THREE.BackSide,depthWrite:false}));
+scene.add(atmoMid);
+// Outer diffuse glow
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(GLOBE_R+2.0,64,64),
+  new THREE.MeshBasicMaterial({color:0x001a44,transparent:true,opacity:0.07,side:THREE.BackSide,depthWrite:false})));
+// Wide deep-space corona
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(GLOBE_R+3.6,64,64),
+  new THREE.MeshBasicMaterial({color:0x000c22,transparent:true,opacity:0.04,side:THREE.BackSide,depthWrite:false})));
+
+// ── Stars ──
+(function(){
+  const pts = [];
+  for (let i = 0; i < 2200; i++) {
+    const v = new THREE.Vector3((Math.random()-.5)*500,(Math.random()-.5)*500,(Math.random()-.5)*500);
+    if (v.length() > 40) pts.push(v);
+  }
+  scene.add(new THREE.Points(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.PointsMaterial({ color:0x223355, size:0.11, transparent:true, opacity:0.85 })
+  ));
+})();
+
+// ── Country outlines ──
+function latLonToVec3(lat, lon, r) {
+  const phi   = (90 - lat) * Math.PI / 180;
+  const theta = (lon + 180) * Math.PI / 180;
+  return new THREE.Vector3(
+    -r * Math.sin(phi) * Math.cos(theta),
+    r * Math.cos(phi),
+    r * Math.sin(phi) * Math.sin(theta)
+  );
+}
+
+// ── Globe map texture ──
+// Paints ocean / land / borders / coastlines onto a canvas,
+// then wraps it onto the sphere as an equirectangular texture.
+async function buildGlobeTexture() {
+  const world = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(r => r.json());
+
+  const W = 4096, H = 2048;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const ctx = c.getContext('2d');
+
+  // Equirectangular projection helper
+  function xy(lon, lat) {
+    return [(lon + 180) / 360 * W, (90 - lat) / 180 * H];
+  }
+
+  // Draw a GeoJSON polygon ring set as a path
+  function tracePoly(rings) {
+    ctx.beginPath();
+    rings.forEach(ring => {
+      ring.forEach(([lon, lat], i) => {
+        const [x, y] = xy(lon, lat);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.closePath();
+    });
+  }
+
+  // Draw a mesh line set (MultiLineString coordinates)
+  function traceLines(coordinates) {
+    coordinates.forEach(line => {
+      if (line.length < 2) return;
+      ctx.beginPath();
+      line.forEach(([lon, lat], i) => {
+        const [x, y] = xy(lon, lat);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    });
+  }
+
+  // 1 — Ocean (near black with a hint of deep blue)
+  ctx.fillStyle = '#000911';
+  ctx.fillRect(0, 0, W, H);
+
+  // 2 — Land fill (dark charcoal-navy — clearly visible against ocean)
+  const countries = topojson.feature(world, world.objects.countries);
+  ctx.fillStyle = '#0c2237';
+  countries.features.forEach(f => {
+    if (!f.geometry) return;
+    const polys = f.geometry.type === 'Polygon'
+      ? [f.geometry.coordinates]
+      : f.geometry.coordinates;
+    polys.forEach(poly => { tracePoly(poly); ctx.fill('evenodd'); });
+  });
+
+  // 3 — Internal country borders (subtle, dim blue-white)
+  const inner = topojson.mesh(world, world.objects.countries, (a, b) => a !== b);
+  ctx.strokeStyle = 'rgba(80, 160, 200, 0.55)';
+  ctx.lineWidth = 1.2;
+  traceLines(inner.coordinates);
+
+  // 4 — Coastlines: wide cyan glow pass first, then crisp bright line on top
+  const outer = topojson.mesh(world, world.objects.countries, (a, b) => a === b);
+
+  // Glow halo
+  ctx.strokeStyle = 'rgba(0, 200, 255, 0.15)';
+  ctx.lineWidth = 8;
+  traceLines(outer.coordinates);
+
+  // Mid glow
+  ctx.strokeStyle = 'rgba(0, 200, 255, 0.35)';
+  ctx.lineWidth = 4;
+  traceLines(outer.coordinates);
+
+  // Crisp edge
+  ctx.strokeStyle = 'rgba(0, 220, 255, 0.95)';
+  ctx.lineWidth = 1.8;
+  traceLines(outer.coordinates);
+
+  // 5 — Time zone bands (every 15° lon) + UTC offset labels
+  ctx.setLineDash([6, 14]);
+  ctx.strokeStyle = 'rgba(0, 180, 240, 0.32)';
+  ctx.lineWidth = 1.5;
+  for (let tlon = -165; tlon <= 180; tlon += 15) {
+    const tx = (tlon + 180) / 360 * W;
+    ctx.beginPath(); ctx.moveTo(tx, 0); ctx.lineTo(tx, H); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // ── Timezone band — clean uniform map legend at top of globe ──
+  const TZ = [
+    { off:-12, abbr:'BIT'  }, { off:-11, abbr:'NUT'  }, { off:-10, abbr:'HST'  },
+    { off: -9, abbr:'AKT'  }, { off: -8, abbr:'PST'  }, { off: -7, abbr:'MST'  },
+    { off: -6, abbr:'CST'  }, { off: -5, abbr:'EST'  }, { off: -4, abbr:'AST'  },
+    { off: -3, abbr:'BRT'  }, { off: -2, abbr:'FNT'  }, { off: -1, abbr:'CVT'  },
+    { off:  0, abbr:'UTC'  }, { off: +1, abbr:'CET'  }, { off: +2, abbr:'EET'  },
+    { off: +3, abbr:'MSK'  }, { off: +4, abbr:'GST'  }, { off: +5, abbr:'PKT'  },
+    { off: +6, abbr:'BST'  }, { off: +7, abbr:'ICT'  }, { off: +8, abbr:'CST'  },
+    { off: +9, abbr:'JST'  }, { off:+10, abbr:'AEST' }, { off:+11, abbr:'SBT'  },
+    { off:+12, abbr:'NZST' },
+  ];
+
+  // Band background
+  const bTop = (90 - 80) / 180 * H;
+  const bBot = (90 - 62) / 180 * H;
+  ctx.fillStyle = 'rgba(0, 50, 100, 0.09)';
+  ctx.fillRect(0, bTop, W, bBot - bTop);
+
+  // Top and bottom border lines
+  ctx.setLineDash([]);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(0, 200, 255, 0.22)';
+  [bTop, bBot].forEach(y => {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  });
+
+  // Vertical dividers at each zone boundary
+  for (let i = 0; i <= 24; i++) {
+    const lon = -180 + i * 15;
+    const tx  = (lon + 180) / 360 * W;
+    ctx.strokeStyle = 'rgba(0, 180, 240, 0.20)';
+    ctx.lineWidth   = 0.8;
+    ctx.beginPath(); ctx.moveTo(tx, bTop); ctx.lineTo(tx, bBot); ctx.stroke();
+  }
+
+  // Labels — uniform two lines per zone: abbreviation + offset
+  const rowAbbr = bTop + (bBot - bTop) * 0.36;  // upper line: abbreviation
+  const rowOff  = bTop + (bBot - bTop) * 0.72;  // lower line: UTC offset
+  const fAbbr   = Math.round(W / 122);
+  const fOff    = Math.round(W / 140);
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+
+  TZ.forEach(({ off, abbr }) => {
+    const cx = (off * 15 + 7.5 + 180) / 360 * W;
+    // Abbreviation
+    ctx.font      = `bold ${fAbbr}px "IBM Plex Mono", monospace`;
+    ctx.fillStyle = off === 0 ? 'rgba(0, 240, 255, 1.0)' : 'rgba(180, 230, 255, 0.75)';
+    ctx.fillText(abbr, cx, rowAbbr);
+    // Offset number
+    const offLabel = off === 0 ? '±0' : off > 0 ? `+${off}` : `${off}`;
+    ctx.font      = `${fOff}px "IBM Plex Mono", monospace`;
+    ctx.fillStyle = off === 0 ? 'rgba(0, 220, 255, 0.85)' : 'rgba(130, 200, 240, 0.55)';
+    ctx.fillText(offLabel, cx, rowOff);
+  });
+
+  // South mirror — every 3rd zone, subtle
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const lblYS  = (90 + 62) / 180 * H;
+  const fSizeS = Math.round(W / 120);
+  ctx.font = `${fSizeS}px "IBM Plex Mono", monospace`;
+  for (let tz = -12; tz <= 12; tz += 3) {
+    const tx    = (tz * 15 + 7.5 + 180) / 360 * W;
+    const label = tz === 0 ? 'UTC' : tz > 0 ? `+${tz}` : `${tz}`;
+    ctx.fillStyle = 'rgba(0, 190, 240, 0.32)';
+    ctx.fillText(label, tx, lblYS);
+  }
+
+  // 6 — Hex grid baked into globe texture
+  (function drawGlobeHex() {
+    const S = 82; // circumradius in texture pixels (flat-top)
+    const colW = S * 1.5;
+    const rowH = S * Math.sqrt(3);
+    const cols = Math.ceil(W / colW) + 3;
+    const rows = Math.ceil(H / rowH) + 3;
+    ctx.strokeStyle = 'rgba(0, 200, 255, 0.055)';
+    ctx.lineWidth = 1.1;
+    for (let col = -1; col < cols; col++) {
+      for (let row = -1; row < rows; row++) {
+        const cx = col * colW;
+        const cy = row * rowH + (col % 2 !== 0 ? rowH / 2 : 0);
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const angle = (Math.PI / 3) * i;
+          const x = cx + S * Math.cos(angle);
+          const y = cy + S * Math.sin(angle);
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+    }
+  })();
+
+  // 7 — Apply to globe
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  globeMat.map = tex;
+  globeMat.color.setHex(0xffffff);
+  globeMat.needsUpdate = true;
+}
+buildGlobeTexture().catch(e => console.warn('Globe map failed:', e));
+
+// ═══════════════════════════════════════════════════
+//  SCAN SWEEP LINE — vertical ring rotating around globe
+// ═══════════════════════════════════════════════════
+const _scanPts = [];
+for (let i = 0; i <= 100; i++) {
+  const phi = (i / 100) * Math.PI * 2;
+  _scanPts.push(new THREE.Vector3(0, (GLOBE_R+0.07)*Math.cos(phi), (GLOBE_R+0.07)*Math.sin(phi)));
+}
+const scanLine = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(_scanPts),
+  new THREE.LineBasicMaterial({ color:0x00c8ff, transparent:true, opacity:0.18 })
+);
+scene.add(scanLine); // NOT in G — sweeps independently of globe rotation
+const scanHalo = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(_scanPts.map(p => p.clone().multiplyScalar((GLOBE_R+0.22)/(GLOBE_R+0.07)))),
+  new THREE.LineBasicMaterial({ color:0x00c8ff, transparent:true, opacity:0.07 })
+);
+scene.add(scanHalo);
+
+// ── City pins ──
+const pinMeshes = [];
+const ringData  = [];
+
+CITIES.forEach((city, idx) => {
+  const pos = latLonToVec3(city.lat, city.lon, GLOBE_R);
+  const dir = pos.clone().normalize();
+
+  // Dot
+  const pinMat = new THREE.MeshPhongMaterial({
+    color: 0xffffff, emissive: 0x00c8ff, emissiveIntensity: 0.85, shininess: 140
+  });
+  const pin = new THREE.Mesh(new THREE.SphereGeometry(0.044, 10, 10), pinMat);
+  pin.position.copy(pos.clone().add(dir.clone().multiplyScalar(0.05)));
+  pin.userData = { cityIdx: idx };
+  G.add(pin);
+  pinMeshes.push(pin);
+
+  // Spike
+  const spike = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.002, 0.007, 0.14, 5),
+    new THREE.MeshBasicMaterial({ color:0x00c8ff, transparent:true, opacity:0.25 })
+  );
+  spike.position.copy(pos.clone().add(dir.clone().multiplyScalar(0.12)));
+  spike.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir);
+  G.add(spike);
+
+  // Pulse ring
+  const ringMat = new THREE.MeshBasicMaterial({
+    color:0x00c8ff, transparent:true, opacity:0.28, side:THREE.DoubleSide
+  });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.07, 0.09, 20), ringMat);
+  ring.position.copy(pos.clone().add(dir.clone().multiplyScalar(0.05)));
+  ring.lookAt(pos.clone().add(dir));
+  G.add(ring);
+  ringData.push({ mesh:ring, offset: idx*0.39, basePos:pos.clone(), dir:dir.clone() });
+});
+
+// ── Invisible hit spheres — larger radius on mobile for fat-finger tapping ──
+const hitMat   = new THREE.MeshBasicMaterial({ visible: false });
+const hitGeo   = new THREE.SphereGeometry(window.innerWidth < 640 ? 0.32 : 0.20, 8, 8);
+const hitMeshes = [];
+CITIES.forEach((city, idx) => {
+  const pos = latLonToVec3(city.lat, city.lon, GLOBE_R);
+  const dir = pos.clone().normalize();
+  const h = new THREE.Mesh(hitGeo, hitMat);
+  h.position.copy(pos.clone().add(dir.clone().multiplyScalar(0.05)));
+  h.userData = { cityIdx: idx };
+  G.add(h);
+  hitMeshes.push(h);
+});
+
+// ═══════════════════════════════════════════════════
+//  CONNECTION ARCS
+// ═══════════════════════════════════════════════════
+const arcGroup = new THREE.Group();
+G.add(arcGroup); // rotates with globe so arcs stay pinned to cities
+const activeArcs = [];
+
+const ARC_PTS = 64;
+function makeArc(iA, iB) {
+  const cA = CITIES[iA], cB = CITIES[iB];
+  const posA = latLonToVec3(cA.lat, cA.lon, GLOBE_R + 0.06);
+  const posB = latLonToVec3(cB.lat, cB.lon, GLOBE_R + 0.06);
+  const mid  = posA.clone().add(posB).multiplyScalar(0.5);
+  mid.normalize().multiplyScalar(GLOBE_R + Math.max(0.9, posA.distanceTo(posB) * 0.38));
+  const curve = new THREE.QuadraticBezierCurve3(posA, mid, posB);
+  const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(ARC_PTS));
+  geo.setDrawRange(0, 0); // starts invisible — drawn progressively
+  const lineMesh = new THREE.Line(geo,
+    new THREE.LineBasicMaterial({ color:0x00c8ff, transparent:true, opacity:0.18 })
+  );
+  arcGroup.add(lineMesh);
+  const dot = new THREE.Mesh(
+    new THREE.SphereGeometry(0.028, 6, 6),
+    new THREE.MeshBasicMaterial({ color:0x00ffff, transparent:true, opacity:0.0 })
+  );
+  arcGroup.add(dot);
+  const trail = new THREE.Mesh(
+    new THREE.SphereGeometry(0.016, 5, 5),
+    new THREE.MeshBasicMaterial({ color:0x00c8ff, transparent:true, opacity:0.0 })
+  );
+  arcGroup.add(trail);
+  return { curve, lineMesh, dot, trail,
+    drawProgress: 0, progress: 0, speed: 0.0018 + Math.random()*0.0022 };
+}
+
+function refreshArcs(focusIdx) {
+  activeArcs.forEach(a => {
+    arcGroup.remove(a.lineMesh); arcGroup.remove(a.dot); arcGroup.remove(a.trail);
+    a.lineMesh.geometry.dispose(); a.lineMesh.material.dispose();
+    a.dot.geometry.dispose(); a.dot.material.dispose();
+    a.trail.geometry.dispose(); a.trail.material.dispose();
+  });
+  activeArcs.length = 0;
+  if (focusIdx < 0) return; // idle: no arcs — only appear on city click
+  const pool = [...Array(CITIES.length).keys()].filter(i => i !== focusIdx);
+  for (let k = 0; k < 6 && pool.length; k++) {
+    activeArcs.push(makeArc(focusIdx, pool.splice(Math.floor(Math.random()*pool.length), 1)[0]));
+  }
+}
+
+// ── City scan rings — burst from clicked pin, then arcs draw ──
+const cityRings = []; // expanding shockwave rings
+
+function triggerCityScan(cityIdx) {
+  const c   = CITIES[cityIdx];
+  const pos = latLonToVec3(c.lat, c.lon, GLOBE_R + 0.08);
+  const dir = pos.clone().normalize();
+  // Create 3 expanding rings with staggered delays
+  for (let k = 0; k < 3; k++) {
+    const mat  = new THREE.MeshBasicMaterial({ color:0x00c8ff, transparent:true, opacity:0.0, side:THREE.DoubleSide });
+    const mesh = new THREE.Mesh(new THREE.RingGeometry(0.05, 0.09, 48), mat);
+    mesh.position.copy(pos);
+    mesh.lookAt(pos.clone().add(dir));
+    G.add(mesh);
+    cityRings.push({ mesh, age: 0, delay: k * 0.18, alive: true });
+  }
+  // After rings start, draw arcs
+  setTimeout(() => refreshArcs(cityIdx), 420);
+}
+
+// ═══════════════════════════════════════════════════
+//  TYPEWRITER
+// ═══════════════════════════════════════════════════
+let _twTimer = null;
+function typewriter(el, text, speed = 16) {
+  if (_twTimer) { clearInterval(_twTimer); _twTimer = null; }
+  el.textContent = '';
+  let i = 0;
+  _twTimer = setInterval(() => {
+    el.textContent += text[i++];
+    if (i >= text.length) { clearInterval(_twTimer); _twTimer = null; }
+  }, speed);
+}
+
+// ═══════════════════════════════════════════════════
+//  RANDOM NODE FLARE
+// ═══════════════════════════════════════════════════
+let flareIdx = -1, flareTime = -999, lastFlare = 0;
+
+// ═══════════════════════════════════════════════════
+//  GLITCH (lat/lon header)
+// ═══════════════════════════════════════════════════
+const _GCHARS = '0123456789';
+let _glitching = false;
+let _latReal = '—', _lonReal = '—';
+
+function glitchLatLon() {
+  if (_glitching) return;
+  _glitching = true;
+  const latEl = document.getElementById('hLat');
+  const lonEl = document.getElementById('hLon');
+  let step = 0;
+  const iv = setInterval(() => {
+    step++;
+    if (step >= 5) {
+      latEl.textContent = _latReal; lonEl.textContent = _lonReal;
+      _glitching = false; clearInterval(iv); return;
+    }
+    const sc = s => s.split('').map(c => /\d/.test(c) && Math.random()<0.55
+      ? _GCHARS[Math.floor(Math.random()*10)] : c).join('');
+    latEl.textContent = sc(_latReal); lonEl.textContent = sc(_lonReal);
+  }, 45);
+}
+
+// ═══════════════════════════════════════════════════
+//  BOOT SEQUENCE
+// ═══════════════════════════════════════════════════
+pinMeshes.forEach(p => { p.visible = false; });
+ringData.forEach(r => { r.mesh.visible = false; });
+setTimeout(() => {
+  const ov = document.getElementById('bootOverlay');
+  if (ov) { ov.classList.add('fade-out'); setTimeout(() => ov.remove(), 900); }
+  pinMeshes.forEach((p, i) => setTimeout(() => { p.visible = true; }, i * 18));
+  ringData.forEach((r, i) => setTimeout(() => { r.mesh.visible = true; }, 1800 + i * 18));
+}, 2300);
+
+// ── Lat/lon from globe surface ──
+function vec3ToLatLon(localNorm) {
+  const lat = Math.asin(Math.max(-1, Math.min(1, localNorm.y))) * 180 / Math.PI;
+  let theta = Math.atan2(localNorm.z, -localNorm.x);
+  if (theta < 0) theta += 2 * Math.PI;
+  const lon = theta * 180 / Math.PI - 180;
+  return { lat, lon };
+}
+
+function fmtCoords(lat, lon) {
+  const la = lat >= 0 ? `${lat.toFixed(2)}° N` : `${Math.abs(lat).toFixed(2)}° S`;
+  const lo = lon >= 0 ? `${lon.toFixed(2)}° E` : `${Math.abs(lon).toFixed(2)}° W`;
+  const utcOff = Math.round(lon / 15);
+  const offStr = utcOff >= 0 ? `UTC+${utcOff}` : `UTC${utcOff}`;
+  const localMs  = Date.now() + utcOff * 3600000;
+  const localDate = new Date(localMs);
+  const hh = String(localDate.getUTCHours()).padStart(2,'0');
+  const mm = String(localDate.getUTCMinutes()).padStart(2,'0');
+  return `${la}  ·  ${lo}  ·  ${offStr}  ·  ${hh}:${mm}`;
+}
+
+// ═══════════════════════════════════════════════════
+//  ROTATION — Drag with momentum + auto-rotate
+// ═══════════════════════════════════════════════════
+let isDragging = false;
+let velX = 0, velY = 0;
+let prevMX = 0, prevMY = 0;
+let lastDX = 0, lastDY = 0;
+const SENS     = 0.007;
+const DECAY    = 0.93;
+const AUTO_SPD = 0.0010;
+const RESUME   = 0.00015;
+
+const raycaster  = new THREE.Raycaster();
+const mouse       = new THREE.Vector2();
+const tooltip     = document.getElementById('tooltip');
+const panel       = document.getElementById('cityPanel');
+const reticleEl   = document.getElementById('reticle');
+let   hoverIdx    = -1; // currently hovered city index (for render-loop reticle update)
+const _rVec       = new THREE.Vector3(); // reusable for reticle projection
+
+canvas.addEventListener('mousedown', e => {
+  isDragging = true;
+  prevMX = e.clientX; prevMY = e.clientY;
+  lastDX = lastDY = 0;
+  canvas.style.cursor = 'grabbing';
+});
+
+window.addEventListener('mousemove', e => {
+  if (isDragging) {
+    lastDX = e.clientX - prevMX;
+    lastDY = e.clientY - prevMY;
+    G.rotation.y += lastDX * SENS;
+    G.rotation.x += lastDY * SENS;
+    G.rotation.x = Math.max(-Math.PI/2.8, Math.min(Math.PI/2.8, G.rotation.x));
+    prevMX = e.clientX; prevMY = e.clientY;
+    tooltip.classList.remove('show');
+    return;
+  }
+
+  mouse.x = (e.clientX / window.innerWidth)  *  2 - 1;
+  mouse.y = (e.clientY / window.innerHeight) * -2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  // Pin hover — use large invisible hit spheres
+  const hits = raycaster.intersectObjects(hitMeshes);
+  if (hits.length) {
+    const ci = hits[0].object.userData.cityIdx;
+    const c = CITIES[ci];
+    document.getElementById('tCity').textContent    = c.name;
+    document.getElementById('tCountry').textContent = c.country;
+    tooltip.style.left = (e.clientX + 16) + 'px';
+    tooltip.style.top  = (e.clientY - 4) + 'px';
+    tooltip.classList.add('show');
+    document.body.classList.add('pin-hover');
+    pinMeshes.forEach((p, i) => {
+      p.material.emissiveIntensity = i === ci ? 2.2 : 0.5;
+    });
+    document.getElementById('fCoords').textContent = `${c.name} · ${c.country}`;
+    hoverIdx = ci;
+  } else {
+    tooltip.classList.remove('show');
+    document.body.classList.remove('pin-hover');
+    hoverIdx = -1;
+    pinMeshes.forEach((p,i) => {
+      p.material.emissiveIntensity = i === selIdx ? 2.5 : 0.85;
+    });
+
+    // Globe surface lat/lon + timezone
+    const gHits = raycaster.intersectObject(globeMesh);
+    if (gHits.length) {
+      const localPt = G.worldToLocal(gHits[0].point.clone()).normalize();
+      const { lat, lon } = vec3ToLatLon(localPt);
+      document.getElementById('fCoords').textContent = fmtCoords(lat, lon);
+    } else {
+      document.getElementById('fCoords').textContent = 'Drag · Scroll to Zoom';
+    }
+  }
+});
+
+window.addEventListener('mouseup', () => {
+  if (!isDragging) return;
+  isDragging = false;
+  canvas.style.cursor = '';
+  velX = lastDY * SENS;
+  velY = lastDX * SENS;
+  glitchLatLon();
+});
+
+canvas.addEventListener('mouseleave', () => { tooltip.classList.remove('show'); });
+
+canvas.addEventListener('click', e => {
+  // Suppress click if significant drag happened
+  if (Math.abs(lastDX) > 4 || Math.abs(lastDY) > 4) return;
+  mouse.x = (e.clientX / window.innerWidth)  *  2 - 1;
+  mouse.y = (e.clientY / window.innerHeight) * -2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(hitMeshes);
+  if (hits.length) openPanel(hits[0].object.userData.cityIdx);
+});
+
+canvas.addEventListener('wheel', e => {
+  camera.position.z = Math.max(8.5, Math.min(24, camera.position.z + e.deltaY * 0.013));
+  e.preventDefault();
+}, { passive: false });
+
+// Touch
+let tPrev = null, tLastDX = 0, tLastDY = 0;
+let tPinchDist = null; // for pinch-to-zoom
+let tTapStart = null;  // for tap detection
+
+function getTouchDist(e) {
+  const dx = e.touches[0].clientX - e.touches[1].clientX;
+  const dy = e.touches[0].clientY - e.touches[1].clientY;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    tPrev = { x:e.touches[0].clientX, y:e.touches[0].clientY };
+    tTapStart = { x:e.touches[0].clientX, y:e.touches[0].clientY, t:Date.now() };
+    isDragging = true; tLastDX = tLastDY = 0;
+    tPinchDist = null;
+  } else if (e.touches.length === 2) {
+    tPinchDist = getTouchDist(e);
+    isDragging = false;
+  }
+  e.preventDefault();
+}, { passive:false });
+
+canvas.addEventListener('touchmove', e => {
+  if (e.touches.length === 2 && tPinchDist !== null) {
+    // Pinch-to-zoom
+    const newDist = getTouchDist(e);
+    const delta = tPinchDist - newDist;
+    camera.position.z = Math.max(8.5, Math.min(24, camera.position.z + delta * 0.04));
+    tPinchDist = newDist;
+    tTapStart = null;
+  } else if (e.touches.length === 1 && isDragging && tPrev) {
+    tLastDX = e.touches[0].clientX - tPrev.x;
+    tLastDY = e.touches[0].clientY - tPrev.y;
+    G.rotation.y += tLastDX * SENS;
+    G.rotation.x += tLastDY * SENS;
+    G.rotation.x = Math.max(-Math.PI/2.8, Math.min(Math.PI/2.8, G.rotation.x));
+    tPrev = { x:e.touches[0].clientX, y:e.touches[0].clientY };
+    // Cancel tap if moved too much
+    if (tTapStart && (Math.abs(tLastDX) > 6 || Math.abs(tLastDY) > 6)) tTapStart = null;
+  }
+  e.preventDefault();
+}, { passive:false });
+
+canvas.addEventListener('touchend', e => {
+  isDragging = false;
+  velX = tLastDY * SENS; velY = tLastDX * SENS;
+  tPinchDist = null;
+  glitchLatLon();
+
+  // Tap detection — quick touch with minimal movement = try to open a city
+  if (tTapStart && (Date.now() - tTapStart.t) < 300) {
+    const tx = tTapStart.x, ty = tTapStart.y;
+    mouse.x = (tx / window.innerWidth)  *  2 - 1;
+    mouse.y = (ty / window.innerHeight) * -2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(hitMeshes);
+    if (hits.length) openPanel(hits[0].object.userData.cityIdx);
+  }
+  tTapStart = null;
+});
+
+// ── Panel ──
+let selIdx = -1;
+let hintDone = false;
+let localClockTimer = null;
+
+function fmtTzLabel(off) {
+  const sign  = off >= 0 ? '+' : '-';
+  const abs   = Math.abs(off);
+  const hrs   = Math.floor(abs);
+  const mins  = Math.round((abs - hrs) * 60);
+  return mins > 0 ? `UTC${sign}${hrs}:${String(mins).padStart(2,'0')}` : `UTC${sign}${hrs}`;
+}
+
+function startLocalClock(city) {
+  const utcOff = (city.name in CITY_TZ) ? CITY_TZ[city.name] : Math.round(city.lon / 15);
+  function tick() {
+    const now  = new Date(Date.now() + utcOff * 3600000);
+    const hh   = String(now.getUTCHours()).padStart(2,'0');
+    const mm   = String(now.getUTCMinutes()).padStart(2,'0');
+    const ss   = String(now.getUTCSeconds()).padStart(2,'0');
+    document.getElementById('pLocalTime').textContent = `${hh}:${mm}:${ss}`;
+  }
+  // Also show timezone label in coords line
+  document.getElementById('panelCoords').textContent =
+    formatCoords(city.lat, city.lon) + '   ' + fmtTzLabel(utcOff);
+  tick();
+  if (localClockTimer) clearInterval(localClockTimer);
+  localClockTimer = setInterval(tick, 1000);
+}
+
+function openPanel(idx) {
+  // Reset previous selected pin
+  if (selIdx >= 0 && selIdx < pinMeshes.length) {
+    pinMeshes[selIdx].scale.setScalar(1);
+  }
+
+  selIdx = idx;
+  const c = CITIES[idx];
+  const id = `NODE-${String(idx+1).padStart(3,'0')}`;
+
+  document.getElementById('panelId').textContent        = `// ${id}`;
+  document.getElementById('panelCity').textContent      = c.name;
+  document.getElementById('panelCountry').textContent   = c.country;
+  document.getElementById('panelContinent').textContent = CONTINENT[c.name] || '—';
+  document.getElementById('panelCoords').textContent    = formatCoords(c.lat, c.lon);
+  document.getElementById('pAgentN').textContent        = c.agents.length;
+  document.getElementById('pIndN').textContent          = c.industries.length;
+  startLocalClock(c);
+  document.getElementById('pIndustries').innerHTML = c.industries.map(i => `<span class="tag">${i}</span>`).join('');
+  typewriter(document.getElementById('pOverview'), c.overview);
+  document.getElementById('pAgents').innerHTML        = c.agents.map(a => `
+    <div class="agent-card">
+      <div class="agent-av">${initials(a.n)}</div>
+      <div>
+        <div class="a-name">${a.n}</div>
+        <div class="a-role">${a.r}</div>
+        <div class="a-avail">Available</div>
+      </div>
+    </div>`).join('');
+
+  panel.classList.add('open');
+  triggerCityScan(idx);
+
+  if (!hintDone) {
+    document.getElementById('hint').style.opacity = '0';
+    hintDone = true;
+  }
+
+  pinMeshes.forEach((p, i) => {
+    p.material.color.setHex(i === idx ? 0x00c8ff : 0xffffff);
+    p.material.emissiveIntensity = i === idx ? 2.5 : 0.85;
+  });
+}
+
+function closePanel() {
+  if (selIdx >= 0 && selIdx < pinMeshes.length) {
+    pinMeshes[selIdx].scale.setScalar(1);
+  }
+  if (localClockTimer) { clearInterval(localClockTimer); localClockTimer = null; }
+  panel.classList.remove('open');
+  selIdx = -1;
+  pinMeshes.forEach(p => { p.material.color.setHex(0xffffff); p.material.emissiveIntensity = 0.85; });
+  refreshArcs(-1);
+}
+window.closePanel = closePanel;
+
+function formatCoords(lat, lon) {
+  const la = lat > 0 ? `${lat.toFixed(2)}° N` : `${Math.abs(lat).toFixed(2)}° S`;
+  const lo = lon > 0 ? `${lon.toFixed(2)}° E` : `${Math.abs(lon).toFixed(2)}° W`;
+  return `${la}  ·  ${lo}`;
+}
+function initials(name) {
+  const parts = name.trim().split(/[\s.]+/).filter(Boolean);
+  return parts.slice(0,2).map(p => p[0]).join('');
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  // Enforce mobile zoom — e.g. when rotating phone
+  if (window.innerWidth < 640 && camera.position.z < 20) camera.position.z = 22;
+  // Enforce desktop zoom when expanding back
+  if (window.innerWidth >= 640 && camera.position.z > 18) camera.position.z = 16;
+});
+
+// ── Clock ──
+function tick() {
+  const u = new Date().toUTCString().match(/(\d{2}:\d{2}:\d{2})/);
+  if (u) document.getElementById('hTime').textContent = u[1];
+}
+setInterval(tick, 1000); tick();
+
+// ── Data Ticker ──
+(function initTicker() {
+  const pairs = [
+    ['NEW YORK','LONDON'],['TOKYO','SINGAPORE'],['DUBAI','FRANKFURT'],
+    ['HONG KONG','SYDNEY'],['SAO PAULO','MIAMI'],['PARIS','MILAN'],
+    ['TORONTO','CHICAGO'],['MUMBAI','ZURICH'],['SEOUL','BEIJING'],
+    ['AMSTERDAM','STOCKHOLM'],['NAIROBI','CAIRO'],['MEXICO CITY','BOGOTA'],
+    ['LOS ANGELES','SHANGHAI'],['JOHANNESBURG','LAGOS'],['ISTANBUL','MOSCOW'],
+  ];
+  const statuses = [
+    'DEAL FLOW: ACTIVE','CHANNEL: SECURE','NODE: ONLINE',
+    'LINK: ESTABLISHED','INTEL: LIVE','NETWORK: NOMINAL',
+  ];
+  const segments = [];
+  pairs.forEach(([a, b], i) => {
+    segments.push(`NODE-${String(i*3+1).padStart(3,'0')} ${a} ⟶ ${b}`);
+    segments.push(statuses[i % statuses.length]);
+    segments.push(`SECTOR-${String(i+1).padStart(2,'0')}`);
+  });
+  const raw = segments.join('  ·  ');
+  // Double the content so the loop is seamless
+  const track = document.getElementById('tickerTrack');
+  track.textContent = raw + '  ·  ' + raw;
+})();
+
+// ── Hex Overlay Canvas ──
+(function initHexCanvas() {
+  const hc = document.getElementById('hexCanvas');
+  function draw() {
+    hc.width  = window.innerWidth;
+    hc.height = window.innerHeight;
+    const ctx = hc.getContext('2d');
+    const S   = 44; // circumradius, flat-top
+    const colW = S * 1.5;
+    const rowH = S * Math.sqrt(3);
+    const cols = Math.ceil(hc.width  / colW) + 3;
+    const rows = Math.ceil(hc.height / rowH) + 3;
+    ctx.strokeStyle = 'rgba(0, 200, 255, 1)'; // opacity controlled by CSS
+    ctx.lineWidth   = 0.7;
+    for (let col = -1; col < cols; col++) {
+      for (let row = -1; row < rows; row++) {
+        const cx = col * colW;
+        const cy = row * rowH + (col % 2 !== 0 ? rowH / 2 : 0);
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const angle = (Math.PI / 3) * i;
+          const x = cx + S * Math.cos(angle);
+          const y = cy + S * Math.sin(angle);
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+    }
+  }
+  draw();
+  window.addEventListener('resize', draw);
+})();
+
+// ── Center lat/lon readout (updated in render loop) ──
+const _frontPt = new THREE.Vector3();
+
+// ═══════════════════════════════════════════════════
+//  RENDER LOOP
+// ═══════════════════════════════════════════════════
+const clock = new THREE.Clock();
+
+(function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  if (isDragging) {
+    // rotation applied directly in mousemove/touchmove
+  } else {
+    // Apply velocity with momentum decay
+    G.rotation.y += velY;
+    G.rotation.x += velX;
+    G.rotation.x = Math.max(-Math.PI/2.8, Math.min(Math.PI/2.8, G.rotation.x));
+    velX *= DECAY;
+    velY *= DECAY;
+
+    // Resume gentle auto-rotate once momentum fades
+    if (Math.abs(velX) < RESUME && Math.abs(velY) < RESUME) {
+      G.rotation.y += AUTO_SPD;
+    }
+  }
+
+  // Atmosphere breathing — slow, independent pulses per layer
+  atmoRim.material.opacity   = 0.022 + 0.008 * Math.sin(t * 0.55);   // face haze — near-zero
+  atmoInner.material.opacity = 0.170 + 0.050 * Math.sin(t * 0.42 + 1.1); // rim breathing
+  atmoMid.material.opacity   = 0.115 + 0.030 * Math.sin(t * 0.31 + 2.3); // mid corona
+
+  // Scan sweep — independent of globe rotation
+  scanLine.rotation.y = t * 0.22;
+  scanHalo.rotation.y = t * 0.22;
+  // Ambient scan — subtle, boosts briefly when a city is selected
+  const scanBase = selIdx >= 0 ? 0.32 : 0.18;
+  scanLine.material.opacity = scanBase + 0.08 * Math.sin(t * 1.8);
+  scanHalo.material.opacity = 0.06 + 0.03 * Math.sin(t * 1.4);
+
+  // Pulse rings
+  ringData.forEach(rd => {
+    const s = 1 + 0.55 * Math.sin(t * 1.5 + rd.offset);
+    rd.mesh.scale.setScalar(s);
+    rd.mesh.material.opacity = 0.25 * (1 - (s-1)/0.55);
+  });
+
+  // Subtle pin float + selected pin grow/glow pulse
+  pinMeshes.forEach((pin, i) => {
+    const rd  = ringData[i];
+    const bob = Math.sin(t * 1.5 + rd.offset) * 0.01;
+    pin.position.copy(rd.basePos.clone().add(rd.dir.clone().multiplyScalar(0.05 + bob)));
+    if (i === selIdx) {
+      const pulse = 1.9 + 0.25 * Math.sin(t * 2.5);
+      pin.scale.setScalar(pulse);
+      pin.material.emissiveIntensity = 5.5 + 1.8 * Math.sin(t * 2.5);
+    }
+  });
+
+  // Arc draw-in + particle animation
+  activeArcs.forEach(arc => {
+    // 1 — Draw the line progressively (0 → 1 over ~0.9s)
+    if (arc.drawProgress < 1) {
+      arc.drawProgress = Math.min(1, arc.drawProgress + 0.015);
+      arc.lineMesh.geometry.setDrawRange(0, Math.floor(arc.drawProgress * (ARC_PTS + 1)));
+    }
+    // 2 — Particle travels once arc is at least 30% drawn
+    if (arc.drawProgress >= 0.3) {
+      arc.progress += arc.speed;
+      if (arc.progress > 1) arc.progress = 0;
+      const pt = arc.curve.getPoint(arc.progress);
+      arc.dot.position.copy(pt);
+      const fade = Math.sin(arc.progress * Math.PI) * arc.drawProgress;
+      arc.dot.material.opacity = 0.92 * fade;
+      const trailP = Math.max(0, arc.progress - 0.045);
+      arc.trail.position.copy(arc.curve.getPoint(trailP));
+      arc.trail.material.opacity = 0.38 * fade;
+    }
+  });
+
+  // City scan rings — expand outward and fade
+  for (let i = cityRings.length - 1; i >= 0; i--) {
+    const cr = cityRings[i];
+    cr.age += 0.016;
+    if (cr.age < cr.delay) continue;
+    const p = Math.min(1, (cr.age - cr.delay) / 1.1);
+    if (p >= 1) {
+      G.remove(cr.mesh);
+      cr.mesh.geometry.dispose(); cr.mesh.material.dispose();
+      cityRings.splice(i, 1); continue;
+    }
+    cr.mesh.scale.setScalar(1 + p * 7); // refined: expands 7x rather than 22x
+    cr.mesh.material.opacity = 0.38 * (1 - p * p); // quadratic fade — holds longer then drops
+  }
+
+  // Update live lat/lon in header (glitch-aware)
+  _frontPt.set(0, 0, GLOBE_R);
+  const localFront = G.worldToLocal(_frontPt.clone()).normalize();
+  const _lat = Math.asin(Math.max(-1, Math.min(1, localFront.y))) * 180 / Math.PI;
+  let   _theta = Math.atan2(localFront.z, -localFront.x);
+  if (_theta < 0) _theta += 2 * Math.PI;
+  const _lon = _theta * 180 / Math.PI - 180;
+  _latReal = _lat >= 0 ? `${_lat.toFixed(1)}° N` : `${Math.abs(_lat).toFixed(1)}° S`;
+  _lonReal = _lon >= 0 ? `${_lon.toFixed(1)}° E` : `${Math.abs(_lon).toFixed(1)}° W`;
+  if (!_glitching) {
+    document.getElementById('hLat').textContent = _latReal;
+    document.getElementById('hLon').textContent = _lonReal;
+  }
+
+  // Update targeting reticle — selected city takes priority over hover
+  const _reticleIdx = selIdx >= 0 ? selIdx : hoverIdx;
+  if (_reticleIdx >= 0) {
+    hitMeshes[_reticleIdx].getWorldPosition(_rVec);
+    _rVec.project(camera);
+    const rx = (_rVec.x + 1) / 2 * window.innerWidth;
+    const ry = -(_rVec.y - 1) / 2 * window.innerHeight;
+    reticleEl.style.left = rx + 'px';
+    reticleEl.style.top  = ry + 'px';
+    if (selIdx >= 0) {
+      reticleEl.className = 'selected';
+      document.getElementById('reticleLabel').textContent = CITIES[selIdx].name;
+    } else {
+      reticleEl.className = 'show';
+      document.getElementById('reticleLabel').textContent = '';
+    }
+  } else {
+    reticleEl.className = '';
+  }
+
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>

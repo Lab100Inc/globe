@@ -4206,7 +4206,8 @@ window.addEventListener('mousemove', e => {
     document.getElementById('fCoords').textContent = `${c.name} · ${c.country}`;
     hoverIdx = ci;
   } else {
-    tooltip.classList.remove('show');
+    // Only hide the tooltip if no city is selected — if one is, the render loop owns it
+    if (selIdx < 0) tooltip.classList.remove('show');
     document.body.classList.remove('pin-hover');
     hoverIdx = -1;
     pinMeshes.forEach((p,i) => {
@@ -4234,7 +4235,7 @@ window.addEventListener('mouseup', () => {
   glitchLatLon();
 });
 
-canvas.addEventListener('mouseleave', () => { tooltip.classList.remove('show'); });
+canvas.addEventListener('mouseleave', () => { if (selIdx < 0) tooltip.classList.remove('show'); });
 
 canvas.addEventListener('click', e => {
   // Suppress click if significant drag happened
@@ -4525,6 +4526,7 @@ function closePanel() {
   if (localClockTimer) { clearInterval(localClockTimer); localClockTimer = null; }
   panel.classList.remove('open');
   document.body.classList.remove('panel-open');
+  tooltip.classList.remove('show');
   panel.querySelector('.p-reveal').classList.remove('visible');
   _viewOffTarget = 0;
   selIdx = -1;
@@ -5135,6 +5137,12 @@ const clock = new THREE.Clock();
     if (selIdx >= 0) {
       reticleEl.className = 'selected';
       document.getElementById('reticleLabel').textContent = CITIES[selIdx].name;
+      // Pin tooltip to selected city — stays on the pin as globe moves
+      document.getElementById('tCity').textContent    = CITIES[selIdx].name;
+      document.getElementById('tCountry').textContent = CITIES[selIdx].country;
+      tooltip.style.left = (rx + 16) + 'px';
+      tooltip.style.top  = (ry - 4)  + 'px';
+      tooltip.classList.add('show');
     } else {
       reticleEl.className = 'show';
       document.getElementById('reticleLabel').textContent = '';

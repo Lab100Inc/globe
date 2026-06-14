@@ -138,7 +138,7 @@ canvas {
   background: transparent;
   color: var(--cyan);
 }
-@media (max-width: 540px) { .h-access-btn { display: none; } }
+/* h-access-btn visible on mobile via 2-row header layout */
 
 /* ── DIRECTORY OVERLAY ── */
 #directoryPanel {
@@ -606,10 +606,16 @@ canvas {
   margin-left: 6px;
 }
 
-.header-right {
+.h-data {
   display: flex;
   align-items: center;
   gap: 22px;
+}
+.h-actions {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-shrink: 0;
 }
 .h-stat {
   display: flex;
@@ -650,17 +656,172 @@ canvas {
 }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.35} }
 
-/* ── MOBILE HEADER ── */
+/* ── STARK SCAN HUD ── */
+#scanHUD {
+  position: fixed;
+  bottom: 88px;
+  right: 18px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: rgba(0,200,255,0.55);
+  z-index: 5;
+  pointer-events: none;
+  text-transform: uppercase;
+  min-width: 192px;
+  user-select: none;
+}
+.shud-divider {
+  border-top: 1px solid rgba(0,200,255,0.14);
+  margin: 6px 0 5px;
+}
+.shud-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 3px;
+}
+.shud-stat-key { color: rgba(0,200,255,0.42); min-width: 48px; }
+.shud-stat-num { min-width: 20px; text-align: right; font-size: 8px; }
+.shud-bar-track {
+  flex: 1;
+  height: 3px;
+  background: rgba(0,200,255,0.08);
+  position: relative;
+  overflow: hidden;
+}
+.shud-bar-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 0%;
+  transition: width 1.4s ease;
+}
+.shud-fill-active  { background: #00e676; box-shadow: 0 0 5px #00e676; }
+.shud-fill-standby { background: #ffb300; box-shadow: 0 0 5px #ffb300; }
+.shud-fill-offline { background: rgba(255,255,255,0.22); }
+.shud-ops { min-height: 46px; }
+.shud-op-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 3px;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.35s, transform 0.35s;
+}
+.shud-op-row.vis { opacity: 1; transform: none; }
+.shud-op-name {
+  font-size: 7.5px;
+  color: rgba(255,255,255,0.78);
+  letter-spacing: 1px;
+}
+.shud-op-city {
+  font-size: 6px;
+  color: rgba(0,200,255,0.48);
+  letter-spacing: 1.5px;
+  margin-left: 6px;
+}
+.shud-header {
+  color: rgba(0,200,255,0.90);
+  border-bottom: 1px solid rgba(0,200,255,0.22);
+  padding-bottom: 5px;
+  margin-bottom: 6px;
+  letter-spacing: 3px;
+  font-size: 7px;
+}
+.shud-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.shud-k { color: rgba(0,200,255,0.42); }
+.shud-v { color: rgba(0,200,255,0.92); }
+.shud-bars {
+  display: flex; align-items: flex-end; gap: 2px; height: 10px;
+}
+.shud-bar {
+  width: 3px;
+  background: rgba(0,200,255,0.75);
+  animation: shudBarPulse 0.7s ease-in-out infinite;
+}
+.shud-lock {
+  color: var(--cyan);
+  font-size: 9px;
+  letter-spacing: 2px;
+  margin-top: 2px;
+  min-height: 14px;
+  text-shadow: 0 0 14px rgba(0,200,255,0.6);
+}
+.shud-lock.flash {
+  animation: scanLockFlash 0.4s ease-out;
+}
+@keyframes shudBarPulse {
+  0%, 100% { transform: scaleY(0.35); opacity: 0.5; }
+  50%       { transform: scaleY(1);    opacity: 1;   }
+}
+@keyframes scanLockFlash {
+  0%   { color: #fff; text-shadow: 0 0 24px #fff, 0 0 48px rgba(0,200,255,0.8); }
+  100% { color: var(--cyan); text-shadow: 0 0 14px rgba(0,200,255,0.6); }
+}
+
+@media (max-width: 540px) { #scanHUD { display: none; } }
+
+/* ── MOBILE HEADER — two-row layout ── */
 @media (max-width: 540px) {
-  #header { gap: 0; }
-  .header-right { gap: 12px; }
-  .h-div { display: none; }
-  .h-stat-cities { display: none; }
+  /* Header becomes a wrapping flex container */
+  #header {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 0;
+    gap: 0;
+    align-items: stretch;
+  }
+
+  /* Row 1 left: logo */
+  #logo {
+    order: 1;
+    flex: 1;
+    padding: 0 14px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    align-self: center;
+  }
+  #logo .l1 { font-size: 12px; letter-spacing: 2px; }
+  #logo .l2 { font-size: 10px; letter-spacing: 1px; }
+
+  /* Row 1 right: action buttons */
+  .h-actions {
+    order: 2;
+    height: 48px;
+    padding: 0 12px;
+    gap: 8px;
+    align-items: center;
+    align-self: center;
+  }
+  .h-actions .h-div { display: none; }
   .h-status { display: none; }
-  .h-val { font-size: 11px; }
-  .h-lbl { font-size: 6px; letter-spacing: 1px; }
-  #logo .l1 { font-size: 13px; letter-spacing: 2px; }
-  #logo .l2 { font-size: 11px; letter-spacing: 1.5px; }
+  .dir-nav-btn  { font-size: 7px; padding: 5px 10px; letter-spacing: 1.5px; }
+  .h-access-btn { display: inline-block; font-size: 7px; padding: 5px 11px; letter-spacing: 1.5px; }
+
+  /* Row 2: coordinate data strip */
+  .h-data {
+    order: 3;
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: center;
+    align-items: center;
+    height: 22px;
+    gap: 0;
+    border-top: 1px solid rgba(0,200,255,0.14);
+    background: rgba(0,200,255,0.025);
+  }
+  .h-data .h-stat   { flex-direction: row; align-items: center; gap: 4px; }
+  .h-data .h-val    { font-size: 8px; letter-spacing: 0.5px; color: rgba(255,255,255,0.82); }
+  .h-data .h-lbl    { font-size: 6px; letter-spacing: 1.5px; color: rgba(0,200,255,0.52); margin-top: 0; }
+  .h-data .h-div    { width: 1px; height: 10px; background: rgba(0,200,255,0.20); display: block; margin: 0 8px; }
+  .h-stat-cities    { display: none; }
 }
 
 /* ── FOOTER ── */
@@ -725,7 +886,20 @@ canvas {
   text-align: center;
   line-height: 1.2;
 }
-@media (max-width: 640px) { #orientHUD { display: none; } }
+@media (max-width: 640px) {
+  #orientHUD {
+    left: 10px;
+    top: auto;
+    bottom: 58px;        /* sit above the ticker bar */
+    transform: none;
+    gap: 7px;
+    opacity: 0.80;
+  }
+  .ohud-track { height: 40px; }
+  .ohud-lbl   { font-size: 6px; }
+  .ohud-val   { font-size: 6px; }
+  .ohud-dot   { width: 4px; height: 4px; }
+}
 
 #footer {
   position: fixed;
@@ -1232,10 +1406,11 @@ body.pin-hover { cursor: crosshair; }
     <span class="l1">Lab 100</span>
     <span class="l2">Inc.</span>
   </div>
-  <div class="header-right">
+  <!-- coordinate data: center on desktop, second row on mobile -->
+  <div class="h-data">
     <div class="h-stat h-stat-cities">
       <div class="h-val">100</div>
-      <div class="h-lbl">Cities</div>
+      <div class="h-lbl">Nodes</div>
     </div>
     <div class="h-div h-stat-cities"></div>
     <div class="h-stat">
@@ -1252,12 +1427,49 @@ body.pin-hover { cursor: crosshair; }
       <div class="h-val" id="hTime">—</div>
       <div class="h-lbl">UTC</div>
     </div>
+  </div>
+  <!-- actions: always on the right -->
+  <div class="h-actions">
+    <div class="h-status">Network Active</div>
     <div class="h-div"></div>
     <button class="dir-nav-btn" onclick="openDirectory()">DIRECTORY</button>
     <div class="h-div"></div>
-    <div class="h-status">Network Active</div>
-    <div class="h-div"></div>
     <button class="h-access-btn" onclick="openAccessPanel()">REQUEST ACCESS</button>
+  </div>
+</div>
+
+<!-- Scan HUD — bottom-right readout -->
+<div id="scanHUD">
+  <div class="shud-header">// NET STATUS</div>
+  <div class="shud-row">
+    <span class="shud-k">NODES</span><span class="shud-v">100</span>
+  </div>
+  <div class="shud-row">
+    <span class="shud-k">AGENTS</span><span class="shud-v" id="shudTotal">—</span>
+  </div>
+  <div class="shud-divider"></div>
+  <div class="shud-stat-row">
+    <span class="shud-stat-key">ACTIVE</span>
+    <span class="shud-stat-num" id="shudActiveN" style="color:#00e676">—</span>
+    <div class="shud-bar-track"><div class="shud-bar-fill shud-fill-active" id="shudActiveFill"></div></div>
+  </div>
+  <div class="shud-stat-row">
+    <span class="shud-stat-key">STANDBY</span>
+    <span class="shud-stat-num" id="shudStandbyN" style="color:#ffb300">—</span>
+    <div class="shud-bar-track"><div class="shud-bar-fill shud-fill-standby" id="shudStandbyFill"></div></div>
+  </div>
+  <div class="shud-stat-row">
+    <span class="shud-stat-key">OFFLINE</span>
+    <span class="shud-stat-num" id="shudOfflineN" style="color:rgba(255,255,255,0.32)">—</span>
+    <div class="shud-bar-track"><div class="shud-bar-fill shud-fill-offline" id="shudOfflineFill"></div></div>
+  </div>
+  <div class="shud-divider"></div>
+  <div class="shud-header">// LIVE OPS</div>
+  <div class="shud-ops" id="shudOps"></div>
+  <div class="shud-divider"></div>
+  <div class="shud-row">
+    <span class="shud-k">SIGNAL</span>
+    <div class="shud-bars" id="scanBars"></div>
   </div>
 </div>
 
@@ -2014,36 +2226,57 @@ const CITIES = [
 ];
 
 // ── Accurate UTC offsets per city (decimal = half-hour zone, e.g. 5.5 = UTC+5:30) ──
-const CITY_TZ = {
+// IANA timezone strings — browser Intl API handles DST automatically
+const CITY_IANA = {
   // North America
-  "New York":-5,"Los Angeles":-8,"Chicago":-6,"San Francisco":-8,"Seattle":-8,
-  "Boston":-5,"Miami":-5,"Houston":-6,"Dallas":-6,"Atlanta":-5,
-  "Washington DC":-5,"Denver":-7,"Toronto":-5,"Vancouver":-8,"Montreal":-5,"Winnipeg":-6,
-  "Mexico City":-6,"Guadalajara":-6,"Monterrey":-6,
+  "New York":"America/New_York","Los Angeles":"America/Los_Angeles",
+  "Chicago":"America/Chicago","San Francisco":"America/Los_Angeles",
+  "Seattle":"America/Los_Angeles","Boston":"America/New_York",
+  "Miami":"America/New_York","Houston":"America/Chicago",
+  "Dallas":"America/Chicago","Atlanta":"America/New_York",
+  "Washington DC":"America/New_York","Denver":"America/Denver",
+  "Toronto":"America/Toronto","Vancouver":"America/Vancouver",
+  "Montreal":"America/Toronto","Winnipeg":"America/Winnipeg",
+  "Mexico City":"America/Mexico_City","Guadalajara":"America/Mexico_City",
+  "Monterrey":"America/Monterrey",
   // Central & South America
-  "Panama City":-5,"São Paulo":-3,"Buenos Aires":-3,"Santiago":-4,
-  "Bogotá":-5,"Lima":-5,"Medellín":-5,"Caracas":-4,"Quito":-5,
+  "Panama City":"America/Panama","São Paulo":"America/Sao_Paulo",
+  "Buenos Aires":"America/Argentina/Buenos_Aires","Santiago":"America/Santiago",
+  "Bogotá":"America/Bogota","Lima":"America/Lima",
+  "Medellín":"America/Bogota","Caracas":"America/Caracas","Quito":"America/Guayaquil",
   // Europe
-  "London":0,"Paris":1,"Frankfurt":1,"Zurich":1,"Amsterdam":1,"Stockholm":1,
-  "Milan":1,"Madrid":1,"Warsaw":1,"Brussels":1,"Vienna":1,"Copenhagen":1,
-  "Oslo":1,"Helsinki":2,"Dublin":0,"Prague":1,"Athens":2,"Lisbon":0,
-  "Barcelona":1,"Budapest":1,"Moscow":3,"Bucharest":2,"Istanbul":3,
+  "London":"Europe/London","Paris":"Europe/Paris","Frankfurt":"Europe/Berlin",
+  "Zurich":"Europe/Zurich","Amsterdam":"Europe/Amsterdam","Stockholm":"Europe/Stockholm",
+  "Milan":"Europe/Rome","Madrid":"Europe/Madrid","Warsaw":"Europe/Warsaw",
+  "Brussels":"Europe/Brussels","Vienna":"Europe/Vienna","Copenhagen":"Europe/Copenhagen",
+  "Oslo":"Europe/Oslo","Helsinki":"Europe/Helsinki","Dublin":"Europe/Dublin",
+  "Prague":"Europe/Prague","Athens":"Europe/Athens","Lisbon":"Europe/Lisbon",
+  "Barcelona":"Europe/Madrid","Budapest":"Europe/Budapest","Moscow":"Europe/Moscow",
+  "Bucharest":"Europe/Bucharest","Istanbul":"Europe/Istanbul",
   // Middle East
-  "Dubai":4,"Riyadh":3,"Doha":3,"Abu Dhabi":4,"Muscat":4,
-  "Amman":3,"Beirut":2,"Tel Aviv":2,
+  "Dubai":"Asia/Dubai","Riyadh":"Asia/Riyadh","Doha":"Asia/Qatar",
+  "Abu Dhabi":"Asia/Dubai","Muscat":"Asia/Muscat",
+  "Amman":"Asia/Amman","Beirut":"Asia/Beirut","Tel Aviv":"Asia/Jerusalem",
   // Africa
-  "Cairo":2,"Johannesburg":2,"Nairobi":3,"Lagos":1,"Casablanca":1,
-  "Addis Ababa":3,"Dar es Salaam":3,"Accra":0,"Cape Town":2,
-  "Abuja":1,"Lusaka":2,"Harare":2,
+  "Cairo":"Africa/Cairo","Johannesburg":"Africa/Johannesburg",
+  "Nairobi":"Africa/Nairobi","Lagos":"Africa/Lagos","Casablanca":"Africa/Casablanca",
+  "Addis Ababa":"Africa/Addis_Ababa","Dar es Salaam":"Africa/Dar_es_Salaam",
+  "Accra":"Africa/Accra","Cape Town":"Africa/Johannesburg",
+  "Abuja":"Africa/Lagos","Lusaka":"Africa/Lusaka","Harare":"Africa/Harare",
   // Asia
-  "Tokyo":9,"Singapore":8,"Hong Kong":8,"Shanghai":8,"Seoul":9,
-  "Bangkok":7,"Jakarta":7,"Kuala Lumpur":8,"Ho Chi Minh City":7,
-  "Bangalore":5.5,"Delhi":5.5,"Mumbai":5.5,"Taipei":8,
-  "Beijing":8,"Shenzhen":8,"Guangzhou":8,"Chengdu":8,"Manila":8,
-  "Karachi":5,"Colombo":5.5,"Dhaka":6,"Phnom Penh":7,
-  "Tashkent":5,"Almaty":5,"Tbilisi":4,"Baku":4,
+  "Tokyo":"Asia/Tokyo","Singapore":"Asia/Singapore","Hong Kong":"Asia/Hong_Kong",
+  "Shanghai":"Asia/Shanghai","Seoul":"Asia/Seoul","Bangkok":"Asia/Bangkok",
+  "Jakarta":"Asia/Jakarta","Kuala Lumpur":"Asia/Kuala_Lumpur",
+  "Ho Chi Minh City":"Asia/Ho_Chi_Minh","Bangalore":"Asia/Kolkata",
+  "Delhi":"Asia/Kolkata","Mumbai":"Asia/Kolkata","Taipei":"Asia/Taipei",
+  "Beijing":"Asia/Shanghai","Shenzhen":"Asia/Shanghai",
+  "Guangzhou":"Asia/Shanghai","Chengdu":"Asia/Shanghai","Manila":"Asia/Manila",
+  "Karachi":"Asia/Karachi","Colombo":"Asia/Colombo","Dhaka":"Asia/Dhaka",
+  "Phnom Penh":"Asia/Phnom_Penh","Tashkent":"Asia/Tashkent",
+  "Almaty":"Asia/Almaty","Tbilisi":"Asia/Tbilisi","Baku":"Asia/Baku",
   // Oceania
-  "Sydney":10,"Melbourne":10,"Perth":8,"Auckland":12,
+  "Sydney":"Australia/Sydney","Melbourne":"Australia/Melbourne",
+  "Perth":"Australia/Perth","Auckland":"Pacific/Auckland",
 };
 
 // ── Continent lookup ──
@@ -2489,197 +2722,216 @@ function clearCountryHighlight() {
 }
 
 // ═══════════════════════════════════════════════════
-//  SCAN SWEEP — JARVIS multi-layer radar scanner
+//  SCAN ARC — single meridional scanner
 // ═══════════════════════════════════════════════════
-const SWEEP_R1 = GLOBE_R + 0.05;  // primary sweep arc (hugs globe)
-const SWEEP_R2 = GLOBE_R + 0.40;  // outer halo arc
-const SWEEP_R3 = GLOBE_R + 0.70;  // far glow arc
+const SWEEP_R1 = GLOBE_R + 0.055;   // core arc (close to globe)
+const SWEEP_R2 = GLOBE_R + 0.13;    // glow halo radius
 
-// Static orbit guides — faint rings showing sweep paths
+// ── Static north-pole mount — the pivot point the arm rotates from ──
+let _mountGlowMat, _mountOuterMat;
 (function() {
-  [[SWEEP_R1, 0.12], [SWEEP_R2, 0.06], [SWEEP_R3, 0.03]].forEach(([r, op]) => {
-    const pts = [];
-    for (let i = 0; i <= 128; i++) {
-      const phi = (i / 128) * Math.PI * 2;
-      pts.push(new THREE.Vector3(0, r * Math.cos(phi), r * Math.sin(phi)));
-    }
-    scene.add(new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(pts),
-      new THREE.LineBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: op })
-    ));
+  // Inner mount ring
+  const mPts = [];
+  for (let i = 0; i <= 64; i++) { const a=(i/64)*Math.PI*2; mPts.push(new THREE.Vector3(Math.cos(a)*0.20,SWEEP_R1,Math.sin(a)*0.20)); }
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(mPts),
+    new THREE.LineBasicMaterial({color:0x00ffff,transparent:true,opacity:0.60})));
+  // Outer mount ring (pulsing)
+  const mPts2 = [];
+  for (let i = 0; i <= 64; i++) { const a=(i/64)*Math.PI*2; mPts2.push(new THREE.Vector3(Math.cos(a)*0.34,SWEEP_R1,Math.sin(a)*0.34)); }
+  _mountOuterMat = new THREE.LineBasicMaterial({color:0x00c8ff,transparent:true,opacity:0.22});
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(mPts2), _mountOuterMat));
+  // 4 tick marks
+  [[1,0],[-1,0],[0,1],[0,-1]].forEach(([x,z]) => {
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(x*0.22,SWEEP_R1,z*0.22),
+      new THREE.Vector3(x*0.36,SWEEP_R1,z*0.36),
+    ]), new THREE.LineBasicMaterial({color:0x00ffff,transparent:true,opacity:0.45})));
   });
+  // Center pivot dot
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.055,8,8), new THREE.MeshBasicMaterial({color:0xffffff}));
+  dot.position.set(0,SWEEP_R1,0); scene.add(dot);
+  // Glow ball around pivot
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.15,8,8), new THREE.MeshBasicMaterial({color:0x00c8ff,transparent:true,opacity:0.36}));
+  glow.position.set(0,SWEEP_R1,0); scene.add(glow);
+  _mountGlowMat = glow.material;
 })();
 
-// Primary sweep group
-const scanGroup  = new THREE.Group();
+// ── Rotating scan group ──
+const scanGroup = new THREE.Group();
 scene.add(scanGroup);
 
-// Counter-rotating JARVIS ring — different orbital plane
-const scanGroup2 = new THREE.Group();
-scene.add(scanGroup2);
-
-const _TRAIL_SEGS = 28;
-const _TRAIL_ARC  = Math.PI * 1.10; // ~198° — nearly half the globe
-const scanTrailMats  = [];
-const scanHaloMats   = [];
-const scanFarMats    = [];
-
-// Primary inner arc
-for (let s = 0; s < _TRAIL_SEGS; s++) {
-  const a0 = (s     / _TRAIL_SEGS) * _TRAIL_ARC;
-  const a1 = ((s+1) / _TRAIL_SEGS) * _TRAIL_ARC;
-  const pts = [];
-  for (let i = 0; i <= 12; i++) {
-    const phi = a0 + (a1 - a0) * (i / 12);
-    pts.push(new THREE.Vector3(0, SWEEP_R1 * Math.cos(phi), SWEEP_R1 * Math.sin(phi)));
-  }
-  const frac = 1 - s / _TRAIL_SEGS;
-  const mat  = new THREE.LineBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: Math.pow(frac, 0.75) * 0.99 });
-  scanTrailMats.push(mat);
-  scanGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
-}
-
-// Outer halo arc
-for (let s = 0; s < _TRAIL_SEGS; s++) {
-  const a0 = (s     / _TRAIL_SEGS) * _TRAIL_ARC;
-  const a1 = ((s+1) / _TRAIL_SEGS) * _TRAIL_ARC;
-  const pts = [];
-  for (let i = 0; i <= 12; i++) {
-    const phi = a0 + (a1 - a0) * (i / 12);
-    pts.push(new THREE.Vector3(0, SWEEP_R2 * Math.cos(phi), SWEEP_R2 * Math.sin(phi)));
-  }
-  const frac = 1 - s / _TRAIL_SEGS;
-  const mat = new THREE.LineBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: Math.pow(frac, 0.85) * 0.50 });
-  scanHaloMats.push(mat);
-  scanGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
-}
-
-// Far glow arc — ~60% of arc length, very faint
-for (let s = 0; s < _TRAIL_SEGS; s++) {
-  const a0 = (s     / _TRAIL_SEGS) * _TRAIL_ARC * 0.6;
-  const a1 = ((s+1) / _TRAIL_SEGS) * _TRAIL_ARC * 0.6;
-  const pts = [];
-  for (let i = 0; i <= 8; i++) {
-    const phi = a0 + (a1 - a0) * (i / 8);
-    pts.push(new THREE.Vector3(0, SWEEP_R3 * Math.cos(phi), SWEEP_R3 * Math.sin(phi)));
-  }
-  const frac = 1 - s / _TRAIL_SEGS;
-  const mat = new THREE.LineBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: Math.pow(frac, 1.2) * 0.20 });
-  scanFarMats.push(mat);
-  scanGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
-}
-
-// Scanner fan wedge — radial lines fanning from globe surface → outer arc at the leading tip
-const _FAN_N      = 8;
-const _FAN_SPREAD = Math.PI * 0.12; // ~21° total fan width
-const fanMats = [];
-for (let f = 0; f < _FAN_N; f++) {
-  const angle = (f / (_FAN_N - 1) - 0.5) * _FAN_SPREAD;
-  const cosA = Math.cos(angle), sinA = Math.sin(angle);
-  const yIn = (GLOBE_R + 0.04) * cosA, zIn = (GLOBE_R + 0.04) * sinA;
-  const yOut = SWEEP_R2 * cosA,        zOut = SWEEP_R2 * sinA;
-  const frac = 1 - Math.abs(f / (_FAN_N - 1) - 0.5) * 2; // peak at center
-  const mat  = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: Math.pow(frac, 0.6) * 0.60 });
-  fanMats.push(mat);
-  scanGroup.add(new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(0, yIn, zIn),
-      new THREE.Vector3(0, yOut, zOut)
-    ]),
-    mat
-  ));
-}
-
-// Leading tip — white flash at inner arc
-const _sweepTip = new THREE.Mesh(
-  new THREE.SphereGeometry(0.10, 8, 8),
-  new THREE.MeshBasicMaterial({ color: 0xffffff })
-);
-_sweepTip.position.set(0, SWEEP_R1, 0);
-scanGroup.add(_sweepTip);
-
-// Inner tip glow
-const _sweepTipHalo = new THREE.Mesh(
-  new THREE.SphereGeometry(0.30, 8, 8),
-  new THREE.MeshBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: 0.42 })
-);
-_sweepTipHalo.position.set(0, SWEEP_R1, 0);
-scanGroup.add(_sweepTipHalo);
-
-// Outer arc tip flash
-const _sweepTipHalo2 = new THREE.Mesh(
-  new THREE.SphereGeometry(0.20, 8, 8),
-  new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.32 })
-);
-_sweepTipHalo2.position.set(0, SWEEP_R2, 0);
-scanGroup.add(_sweepTipHalo2);
-
-// Far arc tip — ghost dot
-const _sweepTipHalo3 = new THREE.Mesh(
-  new THREE.SphereGeometry(0.12, 8, 8),
-  new THREE.MeshBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: 0.18 })
-);
-_sweepTipHalo3.position.set(0, SWEEP_R3, 0);
-scanGroup.add(_sweepTipHalo3);
-
-// Scanner beam — vertical column from outer arc down to globe surface
-const _beamMat = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.85 });
-const _beamLine = new THREE.Line(
-  new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(0, SWEEP_R2, 0),
-    new THREE.Vector3(0, GLOBE_R + 0.04, 0)
-  ]),
-  _beamMat
-);
-scanGroup.add(_beamLine);
-
-// Beam impact dot
-const _beamImpact = new THREE.Mesh(
-  new THREE.SphereGeometry(0.07, 8, 8),
-  new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.95 })
-);
-_beamImpact.position.set(0, GLOBE_R + 0.04, 0);
-scanGroup.add(_beamImpact);
-
-// Impact ripple ring — expands outward from beam hit point
-const _impactRingPts = [];
-for (let i = 0; i <= 40; i++) {
-  const a = (i / 40) * Math.PI * 2;
-  _impactRingPts.push(new THREE.Vector3(Math.cos(a) * 0.22, GLOBE_R + 0.04, Math.sin(a) * 0.22));
-}
-const _impactRingMat = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.60 });
-const _impactRing = new THREE.Line(
-  new THREE.BufferGeometry().setFromPoints(_impactRingPts),
-  _impactRingMat
-);
-scanGroup.add(_impactRing);
-
-// Counter-rotating arc — sweeps opposite direction in perpendicular orbital plane (JARVIS multi-ring)
+// Faint full-circle guide at core radius — shows the orbital path
 (function() {
-  const _CR_SEGS = 18;
-  const _CR_ARC  = Math.PI * 0.65;
-  const R = GLOBE_R + 0.48;
-  for (let s = 0; s < _CR_SEGS; s++) {
-    const a0 = (s / _CR_SEGS) * _CR_ARC;
-    const a1 = ((s+1) / _CR_SEGS) * _CR_ARC;
-    const pts = [];
-    for (let i = 0; i <= 8; i++) {
-      const phi = a0 + (a1 - a0) * (i / 8);
-      pts.push(new THREE.Vector3(R * Math.cos(phi), 0, R * Math.sin(phi)));
-    }
-    const frac = 1 - s / _CR_SEGS;
-    scanGroup2.add(new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(pts),
-      new THREE.LineBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: Math.pow(frac, 1.3) * 0.28 })
-    ));
+  const pts = [];
+  for (let i = 0; i <= 128; i++) { const phi=(i/128)*Math.PI*2; pts.push(new THREE.Vector3(0,SWEEP_R1*Math.cos(phi),SWEEP_R1*Math.sin(phi))); }
+  scanGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({color:0x00c8ff,transparent:true,opacity:0.09})));
+})();
+
+const _SC_SEGS = 30;
+const _SC_ARC  = Math.PI * 0.85; // ~153° — just under half the globe
+const _scCoreMats = [], _scGlowMats = [];
+
+// Core arc — tight to globe surface, sharp falloff at tail
+for (let s = 0; s < _SC_SEGS; s++) {
+  const a0 = (s/_SC_SEGS)*_SC_ARC, a1 = ((s+1)/_SC_SEGS)*_SC_ARC;
+  const pts = [];
+  for (let i = 0; i <= 12; i++) {
+    const phi = a0+(a1-a0)*(i/12);
+    pts.push(new THREE.Vector3(0, SWEEP_R1*Math.cos(phi), SWEEP_R1*Math.sin(phi)));
   }
-  // Counter-ring tip dot
-  const crTip = new THREE.Mesh(
-    new THREE.SphereGeometry(0.07, 8, 8),
-    new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.45 })
-  );
-  crTip.position.set(R, 0, 0);
-  scanGroup2.add(crTip);
+  const frac = 1 - s/_SC_SEGS;
+  // Sharp bright near tip, fast dropoff — comet tail style
+  const mat = new THREE.LineBasicMaterial({color:0x00e8ff,transparent:true,opacity:Math.pow(frac,0.42)*0.96});
+  _scCoreMats.push(mat);
+  scanGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
+}
+
+// Glow halo arc — slightly wider radius, softer
+for (let s = 0; s < _SC_SEGS; s++) {
+  const a0 = (s/_SC_SEGS)*_SC_ARC, a1 = ((s+1)/_SC_SEGS)*_SC_ARC;
+  const pts = [];
+  for (let i = 0; i <= 10; i++) {
+    const phi = a0+(a1-a0)*(i/10);
+    pts.push(new THREE.Vector3(0, SWEEP_R2*Math.cos(phi), SWEEP_R2*Math.sin(phi)));
+  }
+  const frac = 1 - s/_SC_SEGS;
+  const mat = new THREE.LineBasicMaterial({color:0x00c8ff,transparent:true,opacity:Math.pow(frac,0.55)*0.40});
+  _scGlowMats.push(mat);
+  scanGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
+}
+
+// Leading tip — bright white node with cyan glow
+const _scTip = new THREE.Mesh(new THREE.SphereGeometry(0.085,8,8), new THREE.MeshBasicMaterial({color:0xffffff}));
+_scTip.position.set(0,SWEEP_R1,0);
+scanGroup.add(_scTip);
+const _scTipGlowMat = new THREE.MeshBasicMaterial({color:0x00ffff,transparent:true,opacity:0.44});
+const _scTipGlow = new THREE.Mesh(new THREE.SphereGeometry(0.24,8,8), _scTipGlowMat);
+_scTipGlow.position.set(0,SWEEP_R1,0);
+scanGroup.add(_scTipGlow);
+
+// Beam down: vertical line from tip to globe surface
+const _scBeamMat = new THREE.LineBasicMaterial({color:0x00ffff,transparent:true,opacity:0.72});
+scanGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+  new THREE.Vector3(0, SWEEP_R1, 0),
+  new THREE.Vector3(0, GLOBE_R + 0.01, 0)
+]), _scBeamMat));
+
+// Impact dot where beam hits globe
+const _scImpactMat = new THREE.MeshBasicMaterial({color:0x00ffff,transparent:true,opacity:0.88});
+const _scImpact = new THREE.Mesh(new THREE.SphereGeometry(0.06,8,8), _scImpactMat);
+_scImpact.position.set(0, GLOBE_R + 0.01, 0);
+scanGroup.add(_scImpact);
+
+// Ripple ring — expands from impact point
+const _scRipPts = [];
+for (let i = 0; i <= 40; i++) { const a=(i/40)*Math.PI*2; _scRipPts.push(new THREE.Vector3(Math.cos(a)*0.20, GLOBE_R+0.01, Math.sin(a)*0.20)); }
+const _scRipMat  = new THREE.LineBasicMaterial({color:0x00ffff,transparent:true,opacity:0.52});
+const _scRipRing = new THREE.Line(new THREE.BufferGeometry().setFromPoints(_scRipPts), _scRipMat);
+scanGroup.add(_scRipRing);
+
+// ── Network HUD — live agent data ──
+function getCityHour(city) {
+  const tz = CITY_IANA[city.name] || null;
+  const d  = new Date();
+  if (tz) {
+    try {
+      const p = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz, hour12: false, hour: '2-digit'
+      }).formatToParts(d).reduce((a, x) => { a[x.type] = x.value; return a; }, {});
+      return parseInt(p.hour === '24' ? '0' : p.hour);
+    } catch(e) {}
+  }
+  return (d.getUTCHours() + Math.round(city.lon / 15) + 24) % 24;
+}
+
+function computeNetworkStats() {
+  const active = [], standby = [], offline = [];
+  CITIES.forEach(city => {
+    const h  = getCityHour(city);
+    const st = (h >= 9 && h < 18) ? 'active'
+             : (h >= 6 && h < 21) ? 'standby' : 'offline';
+    city.agents.forEach(a => {
+      const item = { n: a.n, city: city.name };
+      (st === 'active' ? active : st === 'standby' ? standby : offline).push(item);
+    });
+  });
+  return { active, standby, offline };
+}
+
+(function initNetworkHUD() {
+  // Signal bars
+  const bars = document.getElementById('scanBars');
+  if (bars) {
+    for (let i = 0; i < 8; i++) {
+      const b = document.createElement('div');
+      b.className = 'shud-bar';
+      b.style.height            = (3 + Math.random() * 7) + 'px';
+      b.style.animationDelay    = (i * 0.09) + 's';
+      b.style.animationDuration = (0.5 + Math.random() * 0.4) + 's';
+      bars.appendChild(b);
+    }
+  }
+
+  let _active = [];
+  let _opsIdx  = 0;
+
+  function refreshStats() {
+    const s     = computeNetworkStats();
+    const total = s.active.length + s.standby.length + s.offline.length;
+    const pct   = n => total > 0 ? (n / total * 100).toFixed(1) + '%' : '0%';
+    const $     = id => document.getElementById(id);
+
+    if ($('shudTotal'))       $('shudTotal').textContent        = total;
+    if ($('shudActiveN'))     $('shudActiveN').textContent      = s.active.length;
+    if ($('shudStandbyN'))    $('shudStandbyN').textContent     = s.standby.length;
+    if ($('shudOfflineN'))    $('shudOfflineN').textContent     = s.offline.length;
+    if ($('shudActiveFill'))  $('shudActiveFill').style.width   = pct(s.active.length);
+    if ($('shudStandbyFill')) $('shudStandbyFill').style.width  = pct(s.standby.length);
+    if ($('shudOfflineFill')) $('shudOfflineFill').style.width  = pct(s.offline.length);
+
+    _active = s.active;
+  }
+
+  function renderOps() {
+    const ops = document.getElementById('shudOps');
+    if (!ops) return;
+
+    // Fade out current rows
+    ops.querySelectorAll('.shud-op-row').forEach(r => r.classList.remove('vis'));
+
+    setTimeout(() => {
+      ops.innerHTML = '';
+      if (!_active.length) {
+        const msg = document.createElement('div');
+        msg.className = 'shud-op-row';
+        msg.innerHTML = '<span class="shud-op-name" style="color:rgba(0,200,255,0.35)">NO ACTIVE OPS</span>';
+        ops.appendChild(msg);
+        setTimeout(() => msg.classList.add('vis'), 60);
+        return;
+      }
+      const show = Math.min(3, _active.length);
+      for (let i = 0; i < show; i++) {
+        const a   = _active[(_opsIdx + i) % _active.length];
+        const row = document.createElement('div');
+        row.className = 'shud-op-row';
+        row.innerHTML = `<span class="shud-op-name">${a.n}</span>`
+                      + `<span class="shud-op-city">${a.city.slice(0,11).toUpperCase()}</span>`;
+        ops.appendChild(row);
+        setTimeout(() => row.classList.add('vis'), i * 90);
+      }
+      _opsIdx = (_opsIdx + 1) % Math.max(1, _active.length);
+    }, 280);
+  }
+
+  // Boot
+  refreshStats();
+  setTimeout(renderOps, 100); // slight delay so widths animate in
+
+  // Cycle ops every 2.5 s
+  setInterval(renderOps,    2500);
+  // Full stat refresh every 60 s (DST/timezone changes)
+  setInterval(refreshStats, 60000);
 })();
 
 
@@ -3114,7 +3366,43 @@ function scrambleDecodeTime(targetText) {
 }
 
 function startLocalClock(city) {
-  const utcOff = (city.name in CITY_TZ) ? CITY_TZ[city.name] : Math.round(city.lon / 15);
+  const tz = CITY_IANA[city.name] || null;
+
+  // Get accurate local time via Intl (handles DST automatically)
+  function getLocalTimeParts() {
+    const d = new Date();
+    if (tz) {
+      const raw = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz, hour12: false,
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      }).formatToParts(d).reduce((a, p) => { a[p.type] = p.value; return a; }, {});
+      const hh = (raw.hour === '24' ? '00' : raw.hour).padStart(2,'0');
+      return { hh, mm: raw.minute.padStart(2,'0'), ss: raw.second.padStart(2,'0'), h: parseInt(hh) };
+    } else {
+      const off = Math.round(city.lon / 15);
+      const n = new Date(Date.now() + off * 3600000);
+      return { hh: String(n.getUTCHours()).padStart(2,'0'),
+               mm: String(n.getUTCMinutes()).padStart(2,'0'),
+               ss: String(n.getUTCSeconds()).padStart(2,'0'),
+               h:  n.getUTCHours() };
+    }
+  }
+
+  // Compute live UTC offset for the TZ label (accounts for DST)
+  function getLiveUTCOffset() {
+    if (!tz) return Math.round(city.lon / 15);
+    const d = new Date();
+    const p = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    }).formatToParts(d).reduce((a, x) => { a[x.type] = x.value; return a; }, {});
+    const localMs = Date.UTC(
+      parseInt(p.year), parseInt(p.month)-1, parseInt(p.day),
+      p.hour === '24' ? 0 : parseInt(p.hour), parseInt(p.minute), parseInt(p.second)
+    );
+    return Math.round((localMs - d.getTime()) / 360000) / 10;
+  }
 
   function getAgentStatus(h) {
     if (h >= 9  && h < 18) return { label: 'ACTIVE',        status: 'active'  };
@@ -3125,23 +3413,17 @@ function startLocalClock(city) {
   }
 
   let firstTick = true;
+  const utcOff = getLiveUTCOffset();
 
   function tick() {
-    const now  = new Date(Date.now() + utcOff * 3600000);
-    const hh   = String(now.getUTCHours()).padStart(2,'0');
-    const mm   = String(now.getUTCMinutes()).padStart(2,'0');
-    const ss   = String(now.getUTCSeconds()).padStart(2,'0');
-    const h    = now.getUTCHours();
-    const sep  = now.getUTCSeconds() % 2 === 0 ? ':' : '·';
-
+    const { hh, mm, ss, h } = getLocalTimeParts();
+    const sep = new Date().getSeconds() % 2 === 0 ? ':' : '·';
     if (firstTick) {
       firstTick = false;
       scrambleDecodeTime(`${hh}:${mm}:${ss}`);
     } else {
       document.getElementById('pLocalTime').textContent = `${hh}${sep}${mm}${sep}${ss}`;
     }
-
-    // Update all visible agent status badges
     const agSt = getAgentStatus(h);
     document.querySelectorAll('.a-avail').forEach(el => {
       el.textContent    = agSt.label;
@@ -3149,7 +3431,6 @@ function startLocalClock(city) {
     });
   }
 
-  // Show timezone label in coords line
   document.getElementById('panelCoords').textContent =
     formatCoords(city.lat, city.lon) + '   ' + fmtTzLabel(utcOff);
   tick();
@@ -3646,41 +3927,23 @@ const clock = new THREE.Clock();
   ohudPVal.textContent = (_pd >= 0 ? '+' : '') + _pd.toFixed(0) + '°';
   ohudYVal.textContent = (_yd >= 0 ? '+' : '') + _yd.toFixed(0) + '°';
 
-  // Scan sweep — JARVIS multi-layer scanner
-  const _scanSpeed = selIdx >= 0 ? 0.52 : 0.36;
-  scanGroup.rotation.y  =  t * _scanSpeed;
-  scanGroup2.rotation.x = -t * 0.19; // counter-rotate perpendicular plane
+  // ── Single scan arc ──
+  scanGroup.rotation.y = t * 0.38;
+  const _sP = 1 + 0.15 * Math.sin(t * 3.2);
+  const _sF = 1 + 0.12 * Math.sin(t * 8.2);
+  const _sS = 1 + 0.07 * Math.sin(t * 1.4);
 
-  const _scanBoost  = selIdx >= 0 ? 1.9 : 1.0;
-  const _scanPulse  = 1 + 0.28 * Math.sin(t * 3.8);
-  const _scanFlick  = 1 + 0.18 * Math.sin(t * 9.0); // fast tip flicker
-  const _scanSlowP  = 1 + 0.12 * Math.sin(t * 1.4); // slow breathe on far ring
-
-  scanTrailMats.forEach((mat, s) => {
-    const frac = 1 - s / _TRAIL_SEGS;
-    mat.opacity = Math.pow(frac, 0.75) * 0.99 * _scanBoost * _scanPulse;
-  });
-  scanHaloMats.forEach((mat, s) => {
-    const frac = 1 - s / _TRAIL_SEGS;
-    mat.opacity = Math.pow(frac, 0.85) * 0.50 * _scanBoost * _scanPulse;
-  });
-  scanFarMats.forEach((mat, s) => {
-    const frac = 1 - s / _TRAIL_SEGS;
-    mat.opacity = Math.pow(frac, 1.2) * 0.20 * _scanBoost * _scanSlowP;
-  });
-  fanMats.forEach((mat, f) => {
-    const frac = 1 - Math.abs(f / (_FAN_N - 1) - 0.5) * 2;
-    mat.opacity = Math.pow(frac, 0.6) * 0.60 * _scanBoost * _scanPulse;
-  });
-  _sweepTipHalo.material.opacity  = 0.42 * _scanBoost * _scanFlick;
-  _sweepTipHalo2.material.opacity = 0.32 * _scanBoost * _scanPulse;
-  _sweepTipHalo3.material.opacity = 0.18 * _scanBoost * _scanSlowP;
-  _beamMat.opacity = 0.85 * _scanBoost * _scanPulse;
-  _beamImpact.material.opacity = 0.95 * _scanBoost * _scanFlick;
-  // Impact ripple — continuously expanding ring that resets
-  const _ripPhase = (t * 1.8) % 1;
-  _impactRing.scale.set(1 + _ripPhase * 1.2, 1, 1 + _ripPhase * 1.2);
-  _impactRingMat.opacity = (1 - _ripPhase) * 0.60 * _scanBoost;
+  _scCoreMats.forEach((mat, s) => { const frac=1-s/_SC_SEGS; mat.opacity=Math.pow(frac,0.42)*0.96*_sP; });
+  _scGlowMats.forEach((mat, s) => { const frac=1-s/_SC_SEGS; mat.opacity=Math.pow(frac,0.55)*0.38*_sP; });
+  _scTipGlowMat.opacity  = 0.44 * _sF;
+  _scBeamMat.opacity     = 0.70 * _sP;
+  _scImpactMat.opacity   = 0.86 * _sF;
+  const _rP = (t * 1.8) % 1;
+  _scRipRing.scale.set(1 + _rP * 1.1, 1, 1 + _rP * 1.1);
+  _scRipMat.opacity = (1 - _rP) * 0.48;
+  // Mount pivot pulse
+  _mountGlowMat.opacity  = 0.34 * _sS;
+  _mountOuterMat.opacity = 0.20 * _sF;
 
   // Pulse rings
   ringData.forEach(rd => {

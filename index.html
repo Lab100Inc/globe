@@ -3319,12 +3319,25 @@ function toggleAgentMode() {
   }
 }
 window.toggleAgentMode = toggleAgentMode;
-// expose _ahcIdx for inline onclick in agent card
-Object.defineProperty(window, '_ahcIdx', { get: () => _ahcIdx, set: v => { _ahcIdx = v; } });
+
+// Called by the OPEN CITY PROFILE button inside the agent touch card
+window.agentCardOpenCity = function(ci) {
+  const card = document.getElementById('agentHoverCard');
+  card.classList.remove('vis', 'touch-card');
+  _ahcIdx = -1;
+  openPanel(ci);
+};
+window.agentCardDismiss = function() {
+  const card = document.getElementById('agentHoverCard');
+  card.classList.remove('vis', 'touch-card');
+  _ahcIdx = -1;
+};
 
 function updateAgentHoverCard() {
   const card = document.getElementById('agentHoverCard');
-  const idx  = hoverIdx >= 0 ? hoverIdx : (selIdx >= 0 ? -1 : -1);
+  // If card was opened by touch, leave it alone — touch events manage it
+  if (card.classList.contains('touch-card')) return;
+  const idx  = hoverIdx >= 0 ? hoverIdx : -1;
   if (!_agentMode || idx < 0) {
     card.classList.remove('vis');
     _ahcIdx = -1;
@@ -4310,7 +4323,7 @@ canvas.addEventListener('touchend', e => {
         card.style.transform = 'translate(-50%, calc(-100% - 14px))';
         card.innerHTML = `<div class="ahc-city">${city.name} // NODE-${String(ci+1).padStart(3,'0')}</div>`
           + city.agents.map(a => `<div class="ahc-agent"><span class="ahc-name">${a.n}</span><span class="ahc-role">${a.r}</span></div>`).join('')
-          + `<button class="ahc-open-btn" onclick="document.getElementById('agentHoverCard').classList.remove('vis','touch-card');_ahcIdx=-1;openPanel(${ci})">OPEN CITY PROFILE</button>`;
+          + `<button class="ahc-open-btn" onclick="agentCardOpenCity(${ci})">OPEN CITY PROFILE</button>`;
         _ahcIdx = ci;
         card.classList.add('vis', 'touch-card');
       } else {
@@ -4529,6 +4542,7 @@ function closePanel() {
   refreshArcs(-1);
 }
 window.closePanel = closePanel;
+window.openPanel  = openPanel;
 
 // ═══════════════════════════════════════════════════
 //  DIRECTORY

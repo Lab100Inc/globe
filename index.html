@@ -41,40 +41,519 @@ canvas {
 }
 
 /* ── ORBIT RINGS — tilted into 3D orbital planes ── */
-.orbit-ring {
+/* ── NAV RINGS — gimbal rings that track globe orientation ── */
+.nav-ring {
   position: fixed;
   border-radius: 50%;
   pointer-events: none;
   z-index: 2;
-  top: 50%; left: 50%;
-  transform-style: preserve-3d;
+  top: 50%;
+  /* left + transform driven by JS so rings follow the globe */
 }
-.orbit-ring.r1 {
-  width: 630px; height: 630px;
-  border: 1px solid rgba(0,200,255,0.09);
-  animation: rspin1 80s linear infinite;
+#ringH {
+  /* Horizontal / equatorial ring */
+  border: 1px solid rgba(0,200,255,0.22);
+  box-shadow: 0 0 12px rgba(0,200,255,0.06), inset 0 0 20px rgba(0,200,255,0.02);
 }
-.orbit-ring.r2 {
-  width: 750px; height: 750px;
-  border: 1px solid rgba(0,200,255,0.05);
-  animation: rspin2 130s linear infinite reverse;
+#ringV {
+  /* Vertical / meridional ring */
+  border: 1px solid rgba(0,200,255,0.16);
+  box-shadow: 0 0 8px rgba(0,200,255,0.04);
 }
-.orbit-ring::before {
+/* Cardinal tick arm — rotates around ring center at --a degrees */
+.ring-tick-arm {
+  position: absolute;
+  width: 100%; height: 100%;
+  top: 0; left: 0;
+  transform: rotate(var(--a));
+}
+/* Tick mark at 12 o'clock of each arm */
+.ring-tick {
+  position: absolute;
+  top: -3px; left: 50%;
+  width: 1px; height: 6px;
+  margin-left: -0.5px;
+  background: rgba(0,200,255,0.38);
+}
+/* Navigation node arm — angle driven by JS */
+.ring-node-arm {
+  position: absolute;
+  width: 100%; height: 100%;
+  top: 0; left: 0;
+}
+/* Glowing node at 12 o'clock of the arm */
+.ring-node {
+  position: absolute;
+  top: -5px; left: 50%;
+  transform: translateX(-50%);
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #00c8ff;
+  box-shadow: 0 0 8px rgba(0,200,255,1), 0 0 18px rgba(0,200,255,0.55), 0 0 30px rgba(0,200,255,0.20);
+}
+/* Bracket arms flanking the node — targeting sight detail */
+.ring-node::before,
+.ring-node::after {
   content: '';
   position: absolute;
-  top: -2px; left: 50%;
-  width: 1px; height: 5px;
+  top: 50%;
+  width: 7px; height: 1px;
+  background: rgba(0,200,255,0.65);
+  transform: translateY(-50%);
+}
+.ring-node::before { right: 100%; margin-right: 3px; }
+.ring-node::after  { left:  100%; margin-left:  3px; }
+/* ── DIRECTORY BUTTON (header) ── */
+.dir-nav-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--white-30);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 2px;
+  padding: 6px 13px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.18s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.dir-nav-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+.h-access-btn {
   background: var(--cyan);
-  opacity: 0.55;
+  border: 1px solid var(--cyan);
+  color: #000;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  padding: 6px 14px;
+  cursor: pointer;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.18s;
 }
-@keyframes rspin1 {
-  from { transform: translate(-50%,-50%) perspective(1100px) rotateX(68deg) rotateZ(0deg); }
-  to   { transform: translate(-50%,-50%) perspective(1100px) rotateX(68deg) rotateZ(360deg); }
+.h-access-btn:hover {
+  background: transparent;
+  color: var(--cyan);
 }
-@keyframes rspin2 {
-  from { transform: translate(-50%,-50%) perspective(1100px) rotateX(55deg) rotateZ(0deg); }
-  to   { transform: translate(-50%,-50%) perspective(1100px) rotateX(55deg) rotateZ(360deg); }
+@media (max-width: 540px) { .h-access-btn { display: none; } }
+
+/* ── DIRECTORY OVERLAY ── */
+#directoryPanel {
+  position: fixed; inset: 0;
+  background: rgba(0,2,6,0.92);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  z-index: 110;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.28s;
 }
+#directoryPanel.open { opacity: 1; pointer-events: all; }
+.dir-inner {
+  width: min(1060px, 96vw);
+  max-height: 84vh;
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border-light);
+  background: rgba(0,0,0,0.55);
+}
+.dir-hdr {
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px 22px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.dir-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; letter-spacing: 3px; color: var(--white);
+  text-transform: uppercase; margin-right: auto;
+}
+.dir-title span { color: var(--cyan); margin-left: 12px; opacity: 0.65; }
+.dir-search {
+  background: transparent; border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--white); font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; letter-spacing: 1.5px;
+  padding: 4px 6px; width: 180px; outline: none;
+  text-transform: uppercase;
+}
+.dir-search::placeholder { color: var(--white-30); letter-spacing: 1px; }
+.dir-close-btn {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--white-30); font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; padding: 5px 10px; cursor: pointer;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.dir-close-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+.dir-table-wrap { overflow-y: auto; flex: 1; }
+.dir-table-wrap::-webkit-scrollbar { width: 2px; }
+.dir-table-wrap::-webkit-scrollbar-thumb { background: var(--border); }
+#dirTable { width: 100%; border-collapse: collapse; font-family: 'IBM Plex Mono', monospace; font-size: 10px; }
+#dirTable thead th {
+  text-align: left; padding: 10px 16px;
+  font-size: 8px; letter-spacing: 2px; color: var(--white-30);
+  border-bottom: 1px solid var(--border); cursor: pointer;
+  user-select: none; white-space: nowrap;
+  position: sticky; top: 0; background: rgba(0,0,0,0.95);
+  transition: color 0.15s;
+}
+#dirTable thead th:hover { color: var(--cyan); }
+#dirTable thead th.dir-sorted { color: var(--cyan); }
+#dirTable tbody tr {
+  border-bottom: 1px solid rgba(0,200,255,0.05);
+  cursor: pointer; transition: background 0.12s;
+}
+#dirTable tbody tr:hover { background: rgba(0,200,255,0.07); }
+#dirTable tbody td { padding: 9px 16px; color: var(--white-30); letter-spacing: 0.5px; }
+.dir-node-id { color: rgba(0,200,255,0.45); font-size: 9px; }
+.dir-city-name { color: var(--white); font-size: 11px; letter-spacing: 1px; }
+.dir-badge {
+  display: inline-block; padding: 2px 7px;
+  border: 1px solid var(--border); font-size: 8px; color: var(--cyan); letter-spacing: 1px;
+}
+.dir-footer {
+  padding: 9px 22px; border-top: 1px solid var(--border);
+  font-size: 8px; letter-spacing: 2px; color: var(--white-30);
+  display: flex; justify-content: space-between; flex-shrink: 0;
+}
+
+/* ── REQUEST ACCESS PANEL ── */
+#accessPanel {
+  position: fixed; inset: 0;
+  background: rgba(0,2,6,0.92);
+  backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+  z-index: 110;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.28s;
+}
+#accessPanel.open { opacity: 1; pointer-events: all; }
+.access-inner { max-height: 84vh; display: flex; flex-direction: column; }
+.access-body {
+  display: flex; gap: 0; flex: 1; overflow: hidden;
+}
+.access-col { padding: 36px 32px; }
+.access-info {
+  flex: 1.1; border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+}
+.access-cta-col {
+  flex: 0.9; display: flex; align-items: center; justify-content: center;
+}
+.access-tag {
+  font-family: 'IBM Plex Mono', monospace; font-size: 7px;
+  letter-spacing: 3px; color: var(--cyan); opacity: 0.7;
+  margin-bottom: 16px; text-transform: uppercase;
+}
+.access-heading {
+  font-size: 28px; font-weight: 600; color: var(--white);
+  letter-spacing: -0.5px; line-height: 1.15; margin: 0 0 16px;
+}
+.access-copy {
+  font-size: 12px; line-height: 1.7; color: var(--white-30);
+  letter-spacing: 0.3px; margin: 0 0 24px; max-width: 340px;
+}
+.access-stats { display: flex; gap: 28px; margin-bottom: 24px; }
+.access-stat { display: flex; flex-direction: column; gap: 4px; }
+.access-stat-n {
+  font-family: 'IBM Plex Mono', monospace; font-size: 22px;
+  color: var(--cyan); letter-spacing: -0.5px; line-height: 1;
+}
+.access-stat-l {
+  font-size: 8px; letter-spacing: 2px; color: var(--white-30);
+  text-transform: uppercase;
+}
+.access-divider { height: 1px; background: var(--border); margin: 20px 0; }
+.access-fine {
+  font-size: 9px; letter-spacing: 1px; color: rgba(255,255,255,0.20);
+  line-height: 1.6; margin-top: auto;
+}
+/* CTA box */
+.access-cta-box { width: 100%; max-width: 300px; }
+.access-cta-label {
+  font-family: 'IBM Plex Mono', monospace; font-size: 8px;
+  letter-spacing: 3px; color: var(--cyan); opacity: 0.65;
+  margin-bottom: 12px;
+}
+.access-cta-copy {
+  font-size: 11px; line-height: 1.6; color: var(--white-30);
+  margin: 0 0 20px;
+}
+.access-email-btn {
+  display: block; width: 100%; box-sizing: border-box;
+  background: var(--cyan); border: 1px solid var(--cyan);
+  color: #000; font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; font-weight: 600; letter-spacing: 2px;
+  padding: 13px 16px; text-align: center; text-decoration: none;
+  text-transform: uppercase; transition: all 0.18s; margin-bottom: 10px;
+}
+.access-email-btn:hover { background: transparent; color: var(--cyan); }
+.access-email-addr {
+  font-family: 'IBM Plex Mono', monospace; font-size: 8px;
+  letter-spacing: 1px; color: rgba(255,255,255,0.22);
+  text-align: center; margin-bottom: 4px;
+}
+.access-steps { display: flex; flex-direction: column; gap: 11px; }
+.access-step {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 10px; color: var(--white-30); letter-spacing: 0.5px;
+}
+.access-step-n {
+  font-family: 'IBM Plex Mono', monospace; font-size: 8px;
+  color: var(--cyan); opacity: 0.55; letter-spacing: 1px; flex-shrink: 0;
+}
+@media (max-width: 640px) {
+  .access-body { flex-direction: column; overflow-y: auto; }
+  .access-info { border-right: none; border-bottom: 1px solid var(--border); }
+  .access-cta-col { justify-content: flex-start; }
+}
+
+/* ── AGENT SERVICES MODAL ── */
+#contactModal {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  z-index: 200; display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.22s;
+}
+#contactModal.open { opacity: 1; pointer-events: all; }
+.cmod-inner {
+  width: min(480px, 94vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  border: 1px solid var(--border-light);
+  background: rgba(2,5,12,0.97);
+  padding: 0;
+  position: relative;
+}
+.cmod-header-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,200,255,0.03);
+}
+.cmod-header-label {
+  font-family: 'IBM Plex Mono', monospace; font-size: 8px;
+  letter-spacing: 3px; color: var(--cyan); opacity: 0.7;
+}
+.cmod-x {
+  background: transparent; border: none; color: var(--white-30);
+  font-size: 12px; cursor: pointer; padding: 2px 6px;
+  transition: color 0.15s;
+}
+.cmod-x:hover { color: var(--white); }
+.cmod-agent-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 18px 0;
+}
+.cmod-av {
+  width: 40px; height: 40px; border: 1px solid var(--border-light);
+  background: var(--cyan-dim); display: flex; align-items: center;
+  justify-content: center; font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px; color: var(--cyan); flex-shrink: 0;
+}
+.cmod-name {
+  font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+  letter-spacing: 1.5px; color: var(--white); text-transform: uppercase;
+}
+.cmod-role { font-size: 9px; letter-spacing: 1px; color: var(--white-30); text-transform: uppercase; margin-top: 2px; }
+.cmod-city { font-size: 8px; letter-spacing: 1.5px; color: var(--cyan); opacity: 0.55; margin-top: 3px; }
+.cmod-divider { height: 1px; background: var(--border); margin: 14px 18px; }
+.cmod-section-lbl {
+  font-family: 'IBM Plex Mono', monospace; font-size: 7px;
+  letter-spacing: 3px; color: var(--white-30); text-transform: uppercase;
+  padding: 0 18px; margin-bottom: 10px;
+}
+/* Service card grid */
+.svc-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 6px; padding: 0 18px; margin-bottom: 14px;
+}
+.svc-card {
+  border: 1px solid var(--border);
+  padding: 12px 13px; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  position: relative; overflow: hidden;
+}
+.svc-card:hover {
+  border-color: rgba(0,200,255,0.40);
+  background: rgba(0,200,255,0.04);
+}
+.svc-card.selected {
+  border-color: var(--cyan);
+  background: rgba(0,200,255,0.08);
+}
+.svc-card.selected::after {
+  content: '✓';
+  position: absolute; top: 8px; right: 10px;
+  font-size: 9px; color: var(--cyan); opacity: 0.8;
+}
+.svc-icon {
+  font-size: 14px; color: var(--cyan); opacity: 0.55;
+  margin-bottom: 7px; line-height: 1;
+}
+.svc-card.selected .svc-icon { opacity: 0.9; }
+.svc-title {
+  font-family: 'IBM Plex Mono', monospace; font-size: 8px;
+  letter-spacing: 1.5px; color: var(--white);
+  text-transform: uppercase; margin-bottom: 5px;
+}
+.svc-desc {
+  font-size: 9px; line-height: 1.5;
+  color: var(--white-30); letter-spacing: 0.3px;
+}
+.svc-card.selected .svc-desc { color: rgba(255,255,255,0.55); }
+/* CTA buttons */
+.cmod-transmit {
+  display: block; width: calc(100% - 36px); margin: 0 18px 8px;
+  background: transparent; border: 1px solid var(--cyan);
+  color: var(--cyan); font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+  letter-spacing: 2px; padding: 12px; cursor: pointer; text-transform: uppercase;
+  transition: all 0.15s;
+}
+.cmod-transmit:hover:not(:disabled) { background: rgba(0,200,255,0.09); }
+.cmod-transmit:disabled {
+  border-color: var(--border); color: var(--white-30);
+  cursor: default; letter-spacing: 1.5px;
+}
+.cmod-cancel {
+  display: block; width: calc(100% - 36px); margin: 0 18px 18px;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--white-30); font-family: 'IBM Plex Mono', monospace; font-size: 8px;
+  letter-spacing: 2px; padding: 9px; cursor: pointer; text-transform: uppercase;
+  transition: all 0.15s;
+}
+.cmod-cancel:hover { color: var(--white); border-color: var(--border-light); }
+
+/* ── TRANSMISSION SCREEN ── */
+#cmodTxScreen {
+  display: none;
+  position: absolute; inset: 0;
+  background: rgba(2,5,12,0.97);
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 0; padding: 40px 28px; text-align: center;
+  overflow: hidden;
+}
+#cmodTxScreen.active { display: flex; }
+/* Scan sweep line */
+.ctx-scan {
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(to right, transparent, var(--cyan), transparent);
+  opacity: 0;
+}
+#cmodTxScreen.active .ctx-scan {
+  animation: ctxScanDown 1.2s cubic-bezier(0.4,0,0.6,1) forwards;
+}
+@keyframes ctxScanDown {
+  0%   { top: 0;    opacity: 0.9; }
+  80%  { opacity: 0.5; }
+  100% { top: 100%; opacity: 0; }
+}
+/* Large agent avatar */
+.ctx-av {
+  width: 52px; height: 52px;
+  border: 1px solid var(--cyan);
+  background: var(--cyan-dim);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'IBM Plex Mono', monospace; font-size: 16px; color: var(--cyan);
+  margin-bottom: 20px;
+  box-shadow: 0 0 20px rgba(0,200,255,0.18);
+  animation: ctxPulse 1.8s ease-in-out infinite;
+}
+@keyframes ctxPulse {
+  0%,100% { box-shadow: 0 0 16px rgba(0,200,255,0.18); }
+  50%      { box-shadow: 0 0 30px rgba(0,200,255,0.38); }
+}
+/* Rolling status line */
+.ctx-status {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+  letter-spacing: 3px; color: var(--cyan);
+  text-transform: uppercase; margin-bottom: 16px;
+  min-height: 16px; transition: opacity 0.25s;
+}
+/* Log lines */
+.ctx-log {
+  font-family: 'IBM Plex Mono', monospace; font-size: 8px;
+  letter-spacing: 1.5px; color: rgba(0,200,255,0.38);
+  text-transform: uppercase; line-height: 2;
+  min-height: 80px;
+}
+.ctx-log-line { opacity: 0; animation: ctxFadeIn 0.3s forwards; }
+@keyframes ctxFadeIn { to { opacity: 1; } }
+/* Big checkmark */
+.ctx-check {
+  font-size: 32px; color: var(--cyan);
+  opacity: 0; margin-top: 12px;
+  transition: opacity 0.4s, transform 0.4s;
+  transform: scale(0.6);
+}
+.ctx-check.show { opacity: 1; transform: scale(1); }
+/* Final message */
+.ctx-done {
+  font-family: 'IBM Plex Mono', monospace; font-size: 9px;
+  letter-spacing: 3px; color: var(--white-30);
+  text-transform: uppercase; margin-top: 10px;
+  opacity: 0; transition: opacity 0.5s;
+}
+.ctx-done.show { opacity: 1; }
+
+/* ── AGENT CONTACT BUTTON ── */
+.a-contact-btn {
+  display: block; width: 100%; margin-top: 8px;
+  background: transparent; border: 1px solid var(--border);
+  color: rgba(0,200,255,0.50); font-family: 'IBM Plex Mono', monospace;
+  font-size: 7px; letter-spacing: 2px; padding: 5px 10px;
+  cursor: pointer; text-transform: uppercase; transition: all 0.15s; text-align: center;
+}
+.a-contact-btn:hover { border-color: var(--cyan); color: var(--cyan); background: rgba(0,200,255,0.05); }
+
+/* ── PANEL SWEEP & REVEAL ── */
+#panelSweep {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(to right, transparent, rgba(0,200,255,0.55), transparent);
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0;
+}
+#panelSweep.active {
+  animation: sweepDown 0.55s cubic-bezier(0.4,0,0.2,1) forwards;
+}
+@keyframes sweepDown {
+  0%   { top: 0;    opacity: 0.9; }
+  80%  { opacity: 0.6; }
+  100% { top: 100%; opacity: 0; }
+}
+#panelStatus {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  color: rgba(0,200,255,0.65);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 61;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+#panelStatus.active { opacity: 1; }
+
+/* content revealed after sweep */
+#cityPanel .p-reveal {
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 0.4s, transform 0.4s;
+}
+#cityPanel .p-reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 
 /* ── VIGNETTE — depth darkening at screen edges ── */
 #vignette {
@@ -186,6 +665,69 @@ canvas {
 }
 
 /* ── FOOTER ── */
+/* ── ORIENT HUD — left-center vertical scan lines ── */
+#orientHUD {
+  position: fixed;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 20;
+  pointer-events: none;
+  display: flex;
+  flex-direction: row;
+  gap: 9px;
+  align-items: center;
+}
+.ohud-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.ohud-lbl {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 7px;
+  letter-spacing: 0.12em;
+  color: rgba(0,200,255,0.35);
+}
+.ohud-track {
+  position: relative;
+  width: 1px;
+  height: 56px;
+  background: rgba(0,200,255,0.15);
+}
+.ohud-tick {
+  position: absolute;
+  left: -2px;
+  width: 5px;
+  height: 1px;
+  background: rgba(0,200,255,0.12);
+}
+.ohud-fill {
+  position: absolute;
+  top: 0; left: 0; width: 100%;
+  background: linear-gradient(to bottom, rgba(0,200,255,0.2), transparent);
+  pointer-events: none;
+}
+.ohud-dot {
+  position: absolute;
+  left: 50%;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: #00c8ff;
+  box-shadow: 0 0 5px rgba(0,200,255,0.85);
+  transform: translate(-50%, -50%);
+  transition: top 0.08s linear;
+}
+.ohud-val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 7px;
+  color: rgba(0,200,255,0.6);
+  text-align: center;
+  line-height: 1.2;
+}
+@media (max-width: 640px) { #orientHUD { display: none; } }
+
 #footer {
   position: fixed;
   bottom: 0; left: 0; right: 0;
@@ -234,7 +776,7 @@ canvas {
   background: var(--surface);
   border-left: 1px solid var(--border);
   z-index: 50;
-  transition: right 0.45s cubic-bezier(0.4,0,0.2,1);
+  transition: right 0.45s cubic-bezier(0.4,0,0.2,1), bottom 0.45s cubic-bezier(0.4,0,0.2,1);
   overflow-y: auto; overflow-x: hidden;
   padding: 26px 26px 40px;
   scrollbar-width: thin;
@@ -282,6 +824,16 @@ canvas {
   font-size: 11px; font-weight: 400;
   color: var(--white-30);
   letter-spacing: 1px; margin-bottom: 8px;
+  font-family: 'IBM Plex Mono', monospace;
+  transition: color 0.3s, text-shadow 0.3s;
+}
+#panelCountry.decoding {
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(0,200,255,0.7), 0 0 22px rgba(0,200,255,0.3);
+}
+#panelCountry.decoded {
+  color: var(--white-30);
+  text-shadow: none;
 }
 #panelCoords {
   font-family: 'IBM Plex Mono', monospace;
@@ -290,9 +842,41 @@ canvas {
   letter-spacing: 1px;
 }
 
+/* ── LOCAL TIME BLOCK ── */
+.time-block {
+  background: var(--cyan-faint);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--cyan);
+  padding: 12px 16px 10px;
+  margin: 12px 0 10px;
+  display: flex; flex-direction: column;
+}
+.time-block-lbl {
+  font-size: 7px; letter-spacing: 3px;
+  color: var(--white-30); text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.time-digits {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 26px; letter-spacing: 3px; line-height: 1;
+  color: var(--cyan);
+  text-shadow: 0 0 14px rgba(0,200,255,0.55), 0 0 40px rgba(0,200,255,0.18);
+  animation: clockGlow 2s ease-in-out infinite;
+}
+@keyframes clockGlow {
+  0%,100% { text-shadow: 0 0 10px rgba(0,200,255,0.45), 0 0 28px rgba(0,200,255,0.12); }
+  50%      { text-shadow: 0 0 22px rgba(0,200,255,0.9),  0 0 52px rgba(0,200,255,0.3); }
+}
+.time-period {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 7px; letter-spacing: 2.5px;
+  color: var(--cyan); opacity: 0.55;
+  text-transform: uppercase; margin-top: 6px;
+}
+
 .data-strip {
   display: flex; gap: 10px;
-  margin: 16px 0;
+  margin: 0 0 16px;
 }
 .d-cell {
   flex: 1;
@@ -368,14 +952,24 @@ canvas {
 .a-avail {
   display: flex; align-items: center; gap: 5px;
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 8px; color: #00e676;
-  letter-spacing: 1px; text-transform: uppercase;
+  font-size: 8px; letter-spacing: 1px; text-transform: uppercase;
+  color: #00e676; transition: color 0.4s;
 }
 .a-avail::before {
   content: '';
-  width: 4px; height: 4px; border-radius: 50%;
+  width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0;
   background: #00e676; box-shadow: 0 0 4px #00e676;
+  transition: background 0.4s, box-shadow 0.4s;
 }
+/* Active — business hours */
+.a-avail[data-status="active"]           { color: #00e676; }
+.a-avail[data-status="active"]::before   { background: #00e676; box-shadow: 0 0 5px #00e676; }
+/* Standby — early / late fringe hours */
+.a-avail[data-status="standby"]          { color: #ffb300; }
+.a-avail[data-status="standby"]::before  { background: #ffb300; box-shadow: 0 0 5px #ffb300; }
+/* Offline — night cycle */
+.a-avail[data-status="offline"]          { color: rgba(255,255,255,0.22); }
+.a-avail[data-status="offline"]::before  { background: rgba(255,255,255,0.18); box-shadow: none; }
 
 /* ── TOOLTIP ── */
 #tooltip {
@@ -550,27 +1144,30 @@ body.pin-hover { cursor: crosshair; }
     width: 72%;
   }
 
-  /* Panel — full width, slides from right, proper safe-area padding */
+  /* Panel — bottom sheet on mobile, leaves globe visible above */
   #cityPanel {
     width: 100%;
-    right: -100%;
-    top: 52px;
-    height: calc(100vh - 52px);
-    height: calc(100dvh - 52px);
+    right: 0;
+    left: 0;
+    top: auto;
+    bottom: -60vh;
+    height: 58vh;
     border-left: none;
     border-top: 1px solid var(--border);
-    padding: 20px max(20px, env(safe-area-inset-right) + 14px) 80px max(20px, env(safe-area-inset-left) + 14px);
-    padding-bottom: max(80px, env(safe-area-inset-bottom) + 60px);
+    border-radius: 0;
+    transition: bottom 0.45s cubic-bezier(0.4,0,0.2,1);
+    padding: 16px max(20px, env(safe-area-inset-right) + 14px) max(60px, env(safe-area-inset-bottom) + 40px) max(20px, env(safe-area-inset-left) + 14px);
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
-  #cityPanel.open { right: 0; }
+  #cityPanel.open { bottom: 0; }
 
   /* Close button — 44px minimum tap target */
   #closePanel { width: 44px; height: 44px; font-size: 14px; }
 
-  /* Orbit rings — scale down to not dominate small screens */
-  .orbit-ring.r1 { width: 440px; height: 440px; }
-  .orbit-ring.r2 { width: 520px; height: 520px; }
+  /* Time block — slightly smaller on mobile */
+  .time-digits { font-size: 20px; letter-spacing: 2px; }
+
 }
 
 /* ── HEX OVERLAY ── */
@@ -592,8 +1189,22 @@ body.pin-hover { cursor: crosshair; }
   <div class="boot-sub">Initializing Network</div>
 </div>
 
-<div class="orbit-ring r1"></div>
-<div class="orbit-ring r2"></div>
+<!-- Horizontal ring: equatorial plane, node tracks yaw -->
+<div id="ringH" class="nav-ring">
+  <div class="ring-tick-arm" style="--a:0deg">  <div class="ring-tick"></div></div>
+  <div class="ring-tick-arm" style="--a:90deg"> <div class="ring-tick"></div></div>
+  <div class="ring-tick-arm" style="--a:180deg"><div class="ring-tick"></div></div>
+  <div class="ring-tick-arm" style="--a:270deg"><div class="ring-tick"></div></div>
+  <div class="ring-node-arm" id="ringHArm"><div class="ring-node"></div></div>
+</div>
+<!-- Vertical ring: meridional plane, node tracks pitch -->
+<div id="ringV" class="nav-ring">
+  <div class="ring-tick-arm" style="--a:0deg">  <div class="ring-tick"></div></div>
+  <div class="ring-tick-arm" style="--a:90deg"> <div class="ring-tick"></div></div>
+  <div class="ring-tick-arm" style="--a:180deg"><div class="ring-tick"></div></div>
+  <div class="ring-tick-arm" style="--a:270deg"><div class="ring-tick"></div></div>
+  <div class="ring-node-arm" id="ringVArm"><div class="ring-node"></div></div>
+</div>
 
 <!-- Vignette depth overlay -->
 <div id="vignette"></div>
@@ -643,7 +1254,37 @@ body.pin-hover { cursor: crosshair; }
       <div class="h-lbl">UTC</div>
     </div>
     <div class="h-div"></div>
+    <button class="dir-nav-btn" onclick="openDirectory()">DIRECTORY</button>
+    <div class="h-div"></div>
     <div class="h-status">Network Active</div>
+    <div class="h-div"></div>
+    <button class="h-access-btn" onclick="openAccessPanel()">REQUEST ACCESS</button>
+  </div>
+</div>
+
+<!-- Orient HUD — left-center vertical scan lines -->
+<div id="orientHUD">
+  <div class="ohud-col">
+    <span class="ohud-lbl">P</span>
+    <div class="ohud-track">
+      <div class="ohud-fill" id="ohudPFill"></div>
+      <div class="ohud-tick" style="top:25%"></div>
+      <div class="ohud-tick" style="top:50%"></div>
+      <div class="ohud-tick" style="top:75%"></div>
+      <div class="ohud-dot" id="ohudPDot"></div>
+    </div>
+    <span class="ohud-val" id="ohudPVal">+0°</span>
+  </div>
+  <div class="ohud-col">
+    <span class="ohud-lbl">Y</span>
+    <div class="ohud-track">
+      <div class="ohud-fill" id="ohudYFill"></div>
+      <div class="ohud-tick" style="top:25%"></div>
+      <div class="ohud-tick" style="top:50%"></div>
+      <div class="ohud-tick" style="top:75%"></div>
+      <div class="ohud-dot" id="ohudYDot"></div>
+    </div>
+    <span class="ohud-val" id="ohudYVal">+0°</span>
   </div>
 </div>
 
@@ -660,6 +1301,9 @@ body.pin-hover { cursor: crosshair; }
 
 <!-- City Panel -->
 <div id="cityPanel">
+  <div id="panelSweep"></div>
+  <div id="panelStatus">ACQUIRING TARGET</div>
+  <div class="p-reveal">
   <div class="p-header">
     <div>
       <div class="p-node-id" id="panelId">// NODE</div>
@@ -671,6 +1315,11 @@ body.pin-hover { cursor: crosshair; }
     <button id="closePanel" onclick="closePanel()">✕</button>
   </div>
 
+  <div class="time-block">
+    <div class="time-block-lbl">Local Time</div>
+    <div class="time-digits" id="pLocalTime">--:--:--</div>
+  </div>
+
   <div class="data-strip">
     <div class="d-cell">
       <div class="d-lbl">Representatives</div>
@@ -679,10 +1328,6 @@ body.pin-hover { cursor: crosshair; }
     <div class="d-cell">
       <div class="d-lbl">Sectors</div>
       <div class="d-val" id="pIndN">—</div>
-    </div>
-    <div class="d-cell">
-      <div class="d-lbl">Local Time</div>
-      <div class="d-val" id="pLocalTime" style="font-size:13px;letter-spacing:1px;">—</div>
     </div>
   </div>
 
@@ -697,6 +1342,162 @@ body.pin-hover { cursor: crosshair; }
   <div class="divider"></div>
   <div class="s-label">Lab 100 Representatives</div>
   <div id="pAgents"></div>
+  </div><!-- /.p-reveal -->
+</div>
+
+<!-- ── DIRECTORY OVERLAY ── -->
+<div id="directoryPanel">
+  <div class="dir-inner">
+    <div class="dir-hdr">
+      <div class="dir-title">Network Directory<span id="dirCountLabel">// 100 Nodes</span></div>
+      <input class="dir-search" id="dirSearch" type="text" placeholder="Search cities, countries..." autocomplete="off" spellcheck="false">
+      <button class="dir-close-btn" onclick="closeDirectory()">✕ CLOSE</button>
+    </div>
+    <div class="dir-table-wrap">
+      <table id="dirTable">
+        <thead>
+          <tr>
+            <th data-col="id">NODE</th>
+            <th data-col="name">CITY</th>
+            <th data-col="country">COUNTRY</th>
+            <th data-col="continent">REGION</th>
+            <th data-col="agents">AGENTS</th>
+            <th data-col="sectors">SECTORS</th>
+          </tr>
+        </thead>
+        <tbody id="dirBody"></tbody>
+      </table>
+    </div>
+    <div class="dir-footer">
+      <span id="dirFooterCount">100 nodes active</span>
+      <span>CLICK ROW TO NAVIGATE</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── REQUEST ACCESS PANEL ── -->
+<div id="accessPanel">
+  <div class="dir-inner access-inner">
+    <div class="dir-hdr">
+      <div class="dir-title">Request Access<span>// Lab 100 Network</span></div>
+      <button class="dir-close-btn" onclick="closeAccessPanel()">✕ CLOSE</button>
+    </div>
+
+    <div class="access-body">
+      <div class="access-col access-info">
+        <div class="access-tag">PRIVATE NETWORK</div>
+        <h2 class="access-heading">Connect Across<br>100 Cities.</h2>
+        <p class="access-copy">Lab 100 connects businesses to vetted representatives across 100 global markets. Our agents broker introductions, facilitate deals, and open doors that aren't accessible through conventional channels.</p>
+        <div class="access-stats">
+          <div class="access-stat"><span class="access-stat-n">100</span><span class="access-stat-l">Cities</span></div>
+          <div class="access-stat"><span class="access-stat-n">6</span><span class="access-stat-l">Continents</span></div>
+          <div class="access-stat"><span class="access-stat-n">12+</span><span class="access-stat-l">Sectors</span></div>
+        </div>
+        <div class="access-divider"></div>
+        <div class="access-fine">Access is by application only. All requests are reviewed by the Lab 100 team.</div>
+      </div>
+
+      <div class="access-col access-cta-col">
+        <div class="access-cta-box">
+          <div class="access-cta-label">// INITIATE REQUEST</div>
+          <p class="access-cta-copy">Send a brief introduction and we'll be in touch within 48 hours.</p>
+          <a class="access-email-btn"
+            href="mailto:garrett@bruceresearch.com?subject=LAB%20100%20%2F%2F%20ACCESS%20REQUEST&body=Hi%20Garrett%2C%0A%0AI%27d%20like%20to%20request%20access%20to%20the%20Lab%20100%20network.%0A%0AName%3A%20%0ACompany%3A%20%0AWebsite%3A%20%0A%0AWhat%20I%27m%20looking%20for%3A%0A">
+            REQUEST ACCESS VIA EMAIL
+          </a>
+          <div class="access-email-addr">garrett@bruceresearch.com</div>
+          <div class="access-divider"></div>
+          <div class="access-steps">
+            <div class="access-step"><span class="access-step-n">01</span><span>Send your introduction</span></div>
+            <div class="access-step"><span class="access-step-n">02</span><span>Review within 48 hours</span></div>
+            <div class="access-step"><span class="access-step-n">03</span><span>Onboarding call scheduled</span></div>
+            <div class="access-step"><span class="access-step-n">04</span><span>Network access granted</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dir-footer">
+      <span>Lab 100 Inc. — Private Business Network</span>
+      <span>© 2026 ALL RIGHTS RESERVED</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── AGENT SERVICES MODAL ── -->
+<div id="contactModal">
+  <div class="cmod-inner">
+
+    <!-- Header -->
+    <div class="cmod-header-bar">
+      <span class="cmod-header-label">// OPEN CHANNEL</span>
+      <button class="cmod-x" onclick="closeContact()">✕</button>
+    </div>
+
+    <!-- Agent identity -->
+    <div class="cmod-agent-row">
+      <div class="cmod-av" id="cmodAv">—</div>
+      <div>
+        <div class="cmod-name" id="cmodName">—</div>
+        <div class="cmod-role" id="cmodRole">—</div>
+        <div class="cmod-city" id="cmodCity">—</div>
+      </div>
+    </div>
+
+    <div class="cmod-divider"></div>
+    <div class="cmod-section-lbl">SELECT A SERVICE</div>
+
+    <!-- Service cards grid -->
+    <div class="svc-grid" id="svcGrid">
+      <div class="svc-card" data-svc="buyers" onclick="selectSvc(this)">
+        <div class="svc-icon">◈</div>
+        <div class="svc-title">FIND BUYERS</div>
+        <div class="svc-desc">Identify qualified buyers for your product or service in this region</div>
+      </div>
+      <div class="svc-card" data-svc="meeting" onclick="selectSvc(this)">
+        <div class="svc-icon">◎</div>
+        <div class="svc-title">SET UP MEETING</div>
+        <div class="svc-desc">Arrange a face-to-face or virtual meeting with key decision-makers</div>
+      </div>
+      <div class="svc-card" data-svc="intro" onclick="selectSvc(this)">
+        <div class="svc-icon">⟶</div>
+        <div class="svc-title">WARM INTRODUCTION</div>
+        <div class="svc-desc">Get a direct intro to a specific company, investor, or contact</div>
+      </div>
+      <div class="svc-card" data-svc="partners" onclick="selectSvc(this)">
+        <div class="svc-icon">⬡</div>
+        <div class="svc-title">PARTNER SOURCING</div>
+        <div class="svc-desc">Find strategic partners, distributors, or local resellers</div>
+      </div>
+      <div class="svc-card" data-svc="intel" onclick="selectSvc(this)">
+        <div class="svc-icon">◉</div>
+        <div class="svc-title">MARKET INTEL</div>
+        <div class="svc-desc">Receive a regional briefing on market conditions and opportunities</div>
+      </div>
+      <div class="svc-card" data-svc="deal" onclick="selectSvc(this)">
+        <div class="svc-icon">◆</div>
+        <div class="svc-title">DEAL FACILITATION</div>
+        <div class="svc-desc">Active support through negotiation, structuring, and close</div>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <button class="cmod-transmit" id="svcSubmitBtn" onclick="transmitContact()" disabled>
+      SELECT A SERVICE TO CONTINUE
+    </button>
+    <button class="cmod-cancel" onclick="closeContact()">CLOSE</button>
+
+    <!-- Transmission screen — shown after submit -->
+    <div id="cmodTxScreen">
+      <div class="ctx-scan"></div>
+      <div class="ctx-av" id="ctxAv">—</div>
+      <div class="ctx-status" id="ctxStatus">INITIATING...</div>
+      <div class="ctx-log" id="ctxLog"></div>
+      <div class="ctx-check" id="ctxCheck">✓</div>
+      <div class="ctx-done" id="ctxDone"></div>
+    </div>
+
+  </div>
 </div>
 
 <div id="tooltip">
@@ -1207,10 +2008,10 @@ const CITIES = [
     overview:"Cambodia's rapidly developing capital. A growing garment and electronics manufacturing hub benefiting from South-South investment and ASEAN market integration.",
     agents:[{n:"S. PRUM",r:"Mekong Region Connector"}] },
 
-  { name:"Tbilisi", country:"Georgia", lat:41.69, lon:44.83,
-    industries:["Finance","Technology","Tourism","Logistics","Energy Transit"],
-    overview:"The Caucasus' most open economy and a fast-growing fintech hub. Georgia's strategic position between Europe and Asia attracts global capital seeking stable ground.",
-    agents:[{n:"G. BERIDZE",r:"Caucasus & Silk Road Broker"}] },
+  { name:"Winnipeg", country:"Canada", lat:49.90, lon:-97.14,
+    industries:["Agriculture","Transportation","Manufacturing","Finance","Clean Energy"],
+    overview:"The Prairie gateway at the geographic heart of North America. Winnipeg anchors Canada's grain trade, controls critical east-west rail logistics, and is an emerging hub for clean energy and advanced manufacturing.",
+    agents:[{n:"L. MACKENZIE",r:"Prairie Region Connector"},{n:"J. CARDINAL",r:"Agriculture & Logistics Broker"}] },
 ];
 
 // ── Accurate UTC offsets per city (decimal = half-hour zone, e.g. 5.5 = UTC+5:30) ──
@@ -1218,7 +2019,7 @@ const CITY_TZ = {
   // North America
   "New York":-5,"Los Angeles":-8,"Chicago":-6,"San Francisco":-8,"Seattle":-8,
   "Boston":-5,"Miami":-5,"Houston":-6,"Dallas":-6,"Atlanta":-5,
-  "Washington DC":-5,"Denver":-7,"Toronto":-5,"Vancouver":-8,"Montreal":-5,
+  "Washington DC":-5,"Denver":-7,"Toronto":-5,"Vancouver":-8,"Montreal":-5,"Winnipeg":-6,
   "Mexico City":-6,"Guadalajara":-6,"Monterrey":-6,
   // Central & South America
   "Panama City":-5,"São Paulo":-3,"Buenos Aires":-3,"Santiago":-4,
@@ -1252,7 +2053,7 @@ const CONTINENT = {
   "San Francisco":"North America","Seattle":"North America","Boston":"North America",
   "Miami":"North America","Houston":"North America","Dallas":"North America",
   "Atlanta":"North America","Washington DC":"North America","Denver":"North America",
-  "Toronto":"North America","Vancouver":"North America","Montreal":"North America",
+  "Toronto":"North America","Vancouver":"North America","Montreal":"North America","Winnipeg":"North America",
   "Mexico City":"North America","Guadalajara":"North America","Monterrey":"North America",
   "Panama City":"Central America",
   "São Paulo":"South America","Buenos Aires":"South America","Santiago":"South America",
@@ -1293,7 +2094,7 @@ renderer.setClearColor(0x000000, 1);
 
 const scene  = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.z = window.innerWidth < 540 ? 22 : 16;
+camera.position.z = window.innerWidth < 640 ? 29 : 19;
 
 // Lighting — soft, even, no harsh specular ball
 scene.add(new THREE.AmbientLight(0x0d2040, 8.0));
@@ -1311,6 +2112,10 @@ scene.add(rimLight);
 // Globe group (all globe elements rotate together)
 const G = new THREE.Group();
 scene.add(G);
+
+// Start facing Europe (lon ≈ 10°E, lat ≈ 45°N)
+G.rotation.y = -1.75;   // rotate so European longitudes face camera
+G.rotation.x = 0.20;    // slight northward tilt toward Europe's latitude
 
 // Base sphere — texture applied once map data loads
 const globeMat = new THREE.MeshPhongMaterial({
@@ -1405,8 +2210,14 @@ function latLonToVec3(lat, lon, r) {
 // ── Globe map texture ──
 // Paints ocean / land / borders / coastlines onto a canvas,
 // then wraps it onto the sphere as an equirectangular texture.
+// Country highlight overlay — filled after buildGlobeTexture resolves
+let _countryFeatures  = null;
+let _hlCanvas         = null;
+let _hlTexture        = null;
+
 async function buildGlobeTexture() {
   const world = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(r => r.json());
+  _countryFeatures = topojson.feature(world, world.objects.countries).features;
 
   const W = 4096, H = 2048;
   const c = document.createElement('canvas');
@@ -1593,8 +2404,90 @@ async function buildGlobeTexture() {
   globeMat.map = tex;
   globeMat.color.setHex(0xffffff);
   globeMat.needsUpdate = true;
+
+  // 8 — Country highlight overlay sphere (sits just above globe surface)
+  _hlCanvas = document.createElement('canvas');
+  _hlCanvas.width = 2048; _hlCanvas.height = 1024;
+  _hlTexture = new THREE.CanvasTexture(_hlCanvas);
+  const hlMat  = new THREE.MeshBasicMaterial({
+    map: _hlTexture, transparent: true, depthWrite: false, opacity: 1
+  });
+  const hlMesh = new THREE.Mesh(new THREE.SphereGeometry(GLOBE_R + 0.018, 64, 32), hlMat);
+  G.add(hlMesh);
 }
 buildGlobeTexture().catch(e => console.warn('Globe map failed:', e));
+
+// ── Country highlight ──────────────────────────────
+function _pointInRing(lon, lat, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if (((yi > lat) !== (yj > lat)) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)
+      inside = !inside;
+  }
+  return inside;
+}
+
+function _findFeature(lat, lon) {
+  if (!_countryFeatures) return null;
+  for (const f of _countryFeatures) {
+    if (!f.geometry) continue;
+    const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
+    for (const poly of polys) {
+      if (_pointInRing(lon, lat, poly[0])) return f;
+    }
+  }
+  return null;
+}
+
+function highlightCountry(lat, lon) {
+  if (!_hlCanvas || !_hlTexture) return;
+  const W = _hlCanvas.width, H = _hlCanvas.height;
+  const ctx = _hlCanvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  const feature = _findFeature(lat, lon);
+  if (!feature) { _hlTexture.needsUpdate = true; return; }
+
+  function xy(ln, lt) { return [(ln + 180) / 360 * W, (90 - lt) / 180 * H]; }
+  function tracePoly(rings) {
+    ctx.beginPath();
+    rings.forEach(ring => {
+      ring.forEach(([ln, lt], i) => {
+        const [x, y] = xy(ln, lt);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.closePath();
+    });
+  }
+
+  const polys = feature.geometry.type === 'Polygon'
+    ? [feature.geometry.coordinates]
+    : feature.geometry.coordinates;
+
+  // Soft fill
+  ctx.fillStyle = 'rgba(0, 200, 255, 0.13)';
+  polys.forEach(poly => { tracePoly(poly); ctx.fill('evenodd'); });
+
+  // Outer glow pass
+  ctx.strokeStyle = 'rgba(0, 220, 255, 0.28)';
+  ctx.lineWidth = 5;
+  polys.forEach(poly => { tracePoly(poly); ctx.stroke(); });
+
+  // Crisp border
+  ctx.strokeStyle = 'rgba(0, 230, 255, 0.82)';
+  ctx.lineWidth = 2;
+  polys.forEach(poly => { tracePoly(poly); ctx.stroke(); });
+
+  _hlTexture.needsUpdate = true;
+}
+
+function clearCountryHighlight() {
+  if (!_hlCanvas || !_hlTexture) return;
+  const ctx = _hlCanvas.getContext('2d');
+  ctx.clearRect(0, 0, _hlCanvas.width, _hlCanvas.height);
+  _hlTexture.needsUpdate = true;
+}
 
 // ═══════════════════════════════════════════════════
 //  SCAN SWEEP LINE — vertical ring rotating around globe
@@ -1680,22 +2573,22 @@ function makeArc(iA, iB) {
   const posA = latLonToVec3(cA.lat, cA.lon, GLOBE_R + 0.06);
   const posB = latLonToVec3(cB.lat, cB.lon, GLOBE_R + 0.06);
   const mid  = posA.clone().add(posB).multiplyScalar(0.5);
-  mid.normalize().multiplyScalar(GLOBE_R + Math.max(0.9, posA.distanceTo(posB) * 0.38));
+  mid.normalize().multiplyScalar(GLOBE_R + Math.max(1.5, posA.distanceTo(posB) * 0.42));
   const curve = new THREE.QuadraticBezierCurve3(posA, mid, posB);
   const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(ARC_PTS));
   geo.setDrawRange(0, 0); // starts invisible — drawn progressively
   const lineMesh = new THREE.Line(geo,
-    new THREE.LineBasicMaterial({ color:0x00c8ff, transparent:true, opacity:0.18 })
+    new THREE.LineBasicMaterial({ color:0xffc844, transparent:true, opacity:0.62 })
   );
   arcGroup.add(lineMesh);
   const dot = new THREE.Mesh(
-    new THREE.SphereGeometry(0.028, 6, 6),
-    new THREE.MeshBasicMaterial({ color:0x00ffff, transparent:true, opacity:0.0 })
+    new THREE.SphereGeometry(0.036, 6, 6),
+    new THREE.MeshBasicMaterial({ color:0xffd060, transparent:true, opacity:0.0 })
   );
   arcGroup.add(dot);
   const trail = new THREE.Mesh(
-    new THREE.SphereGeometry(0.016, 5, 5),
-    new THREE.MeshBasicMaterial({ color:0x00c8ff, transparent:true, opacity:0.0 })
+    new THREE.SphereGeometry(0.022, 5, 5),
+    new THREE.MeshBasicMaterial({ color:0xffaa30, transparent:true, opacity:0.0 })
   );
   arcGroup.add(trail);
   return { curve, lineMesh, dot, trail,
@@ -1710,9 +2603,23 @@ function refreshArcs(focusIdx) {
     a.trail.geometry.dispose(); a.trail.material.dispose();
   });
   activeArcs.length = 0;
-  if (focusIdx < 0) return; // idle: no arcs — only appear on city click
-  const pool = [...Array(CITIES.length).keys()].filter(i => i !== focusIdx);
-  for (let k = 0; k < 6 && pool.length; k++) {
+  if (focusIdx < 0) return;
+
+  // Only connect to cities on the visible side of the globe —
+  // filter by angular distance so arcs don't dive through the sphere.
+  const srcPos = latLonToVec3(CITIES[focusIdx].lat, CITIES[focusIdx].lon, GLOBE_R).normalize();
+  let pool = [...Array(CITIES.length).keys()].filter(i => {
+    if (i === focusIdx) return false;
+    const dstPos = latLonToVec3(CITIES[i].lat, CITIES[i].lon, GLOBE_R).normalize();
+    return srcPos.dot(dstPos) > -0.25; // within ~105° — arc stays on visible hemisphere
+  });
+
+  // Fallback: if somehow pool is too small, use all cities
+  if (pool.length < 8) {
+    pool = [...Array(CITIES.length).keys()].filter(i => i !== focusIdx);
+  }
+
+  for (let k = 0; k < 8 && pool.length; k++) {
     activeArcs.push(makeArc(focusIdx, pool.splice(Math.floor(Math.random()*pool.length), 1)[0]));
   }
 }
@@ -1830,6 +2737,16 @@ const raycaster  = new THREE.Raycaster();
 const mouse       = new THREE.Vector2();
 const tooltip     = document.getElementById('tooltip');
 const panel       = document.getElementById('cityPanel');
+const ringH    = document.getElementById('ringH');
+const ringV    = document.getElementById('ringV');
+const ringHArm = document.getElementById('ringHArm');
+const ringVArm = document.getElementById('ringVArm');
+const ohudPDot    = document.getElementById('ohudPDot');
+const ohudYDot    = document.getElementById('ohudYDot');
+const ohudPFill   = document.getElementById('ohudPFill');
+const ohudYFill   = document.getElementById('ohudYFill');
+const ohudPVal    = document.getElementById('ohudPVal');
+const ohudYVal    = document.getElementById('ohudYVal');
 const reticleEl   = document.getElementById('reticle');
 let   hoverIdx    = -1; // currently hovered city index (for render-loop reticle update)
 const _rVec       = new THREE.Vector3(); // reusable for reticle projection
@@ -1915,7 +2832,7 @@ canvas.addEventListener('click', e => {
 });
 
 canvas.addEventListener('wheel', e => {
-  camera.position.z = Math.max(8.5, Math.min(24, camera.position.z + e.deltaY * 0.013));
+  camera.position.z = Math.max(8.5, Math.min(28, camera.position.z + e.deltaY * 0.013));
   e.preventDefault();
 }, { passive: false });
 
@@ -1948,7 +2865,7 @@ canvas.addEventListener('touchmove', e => {
     // Pinch-to-zoom
     const newDist = getTouchDist(e);
     const delta = tPinchDist - newDist;
-    camera.position.z = Math.max(8.5, Math.min(24, camera.position.z + delta * 0.04));
+    camera.position.z = Math.max(8.5, Math.min(28, camera.position.z + delta * 0.04));
     tPinchDist = newDist;
     tTapStart = null;
   } else if (e.touches.length === 1 && isDragging && tPrev) {
@@ -1986,6 +2903,9 @@ canvas.addEventListener('touchend', e => {
 let selIdx = -1;
 let hintDone = false;
 let localClockTimer = null;
+let _viewOffX = 0, _viewOffTarget = 0;
+let gotoTarget = null;
+let dirSortCol = 'id', dirSortAsc = true;
 
 function fmtTzLabel(off) {
   const sign  = off >= 0 ? '+' : '-';
@@ -1995,16 +2915,66 @@ function fmtTzLabel(off) {
   return mins > 0 ? `UTC${sign}${hrs}:${String(mins).padStart(2,'0')}` : `UTC${sign}${hrs}`;
 }
 
+function scrambleDecodeTime(targetText) {
+  const el    = document.getElementById('pLocalTime');
+  const chars = '0123456789';
+  const dur   = 1400;
+  const fps   = 40;
+  const steps = Math.round(dur / (1000 / fps));
+  let   frame = 0;
+  clearInterval(el._scramTimer);
+  el._scramTimer = setInterval(() => {
+    frame++;
+    const progress = frame / steps;
+    const resolved = Math.floor(progress * targetText.length);
+    let display = '';
+    for (let i = 0; i < targetText.length; i++) {
+      const ch = targetText[i];
+      if (ch === ':' || ch === '·') { display += ch; continue; }
+      display += i < resolved ? ch : chars[Math.floor(Math.random() * chars.length)];
+    }
+    el.textContent = display;
+    if (frame >= steps) clearInterval(el._scramTimer);
+  }, 1000 / fps);
+}
+
 function startLocalClock(city) {
   const utcOff = (city.name in CITY_TZ) ? CITY_TZ[city.name] : Math.round(city.lon / 15);
+
+  function getAgentStatus(h) {
+    if (h >= 9  && h < 18) return { label: 'ACTIVE',        status: 'active'  };
+    if (h >= 7  && h < 9)  return { label: 'COMING ONLINE', status: 'standby' };
+    if (h >= 18 && h < 21) return { label: 'SIGNING OFF',   status: 'standby' };
+    if (h >= 6  && h < 7)  return { label: 'STANDBY',       status: 'standby' };
+    return                         { label: 'OFF GRID',      status: 'offline' };
+  }
+
+  let firstTick = true;
+
   function tick() {
     const now  = new Date(Date.now() + utcOff * 3600000);
     const hh   = String(now.getUTCHours()).padStart(2,'0');
     const mm   = String(now.getUTCMinutes()).padStart(2,'0');
     const ss   = String(now.getUTCSeconds()).padStart(2,'0');
-    document.getElementById('pLocalTime').textContent = `${hh}:${mm}:${ss}`;
+    const h    = now.getUTCHours();
+    const sep  = now.getUTCSeconds() % 2 === 0 ? ':' : '·';
+
+    if (firstTick) {
+      firstTick = false;
+      scrambleDecodeTime(`${hh}:${mm}:${ss}`);
+    } else {
+      document.getElementById('pLocalTime').textContent = `${hh}${sep}${mm}${sep}${ss}`;
+    }
+
+    // Update all visible agent status badges
+    const agSt = getAgentStatus(h);
+    document.querySelectorAll('.a-avail').forEach(el => {
+      el.textContent    = agSt.label;
+      el.dataset.status = agSt.status;
+    });
   }
-  // Also show timezone label in coords line
+
+  // Show timezone label in coords line
   document.getElementById('panelCoords').textContent =
     formatCoords(city.lat, city.lon) + '   ' + fmtTzLabel(utcOff);
   tick();
@@ -2023,8 +2993,8 @@ function openPanel(idx) {
   const id = `NODE-${String(idx+1).padStart(3,'0')}`;
 
   document.getElementById('panelId').textContent        = `// ${id}`;
-  document.getElementById('panelCity').textContent      = c.name;
-  document.getElementById('panelCountry').textContent   = c.country;
+  document.getElementById('panelCity').textContent = c.name;
+  scrambleDecodeCountry(c.country);
   document.getElementById('panelContinent').textContent = CONTINENT[c.name] || '—';
   document.getElementById('panelCoords').textContent    = formatCoords(c.lat, c.lon);
   document.getElementById('pAgentN').textContent        = c.agents.length;
@@ -2032,17 +3002,36 @@ function openPanel(idx) {
   startLocalClock(c);
   document.getElementById('pIndustries').innerHTML = c.industries.map(i => `<span class="tag">${i}</span>`).join('');
   typewriter(document.getElementById('pOverview'), c.overview);
-  document.getElementById('pAgents').innerHTML        = c.agents.map(a => `
+  document.getElementById('pAgents').innerHTML = c.agents.map(a => `
     <div class="agent-card">
       <div class="agent-av">${initials(a.n)}</div>
-      <div>
+      <div style="flex:1;min-width:0">
         <div class="a-name">${a.n}</div>
         <div class="a-role">${a.r}</div>
         <div class="a-avail">Available</div>
+        <button class="a-contact-btn" onclick="openContact('${a.n.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${a.r.replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${c.name.replace(/'/g,"\\'").replace(/"/g,'&quot;')}')">OPEN CHANNEL</button>
       </div>
     </div>`).join('');
 
   panel.classList.add('open');
+
+  // Shift globe left on desktop so panel doesn't cover it
+  if (window.innerWidth >= 640) _viewOffTarget = 200;
+
+  // JARVIS reveal — sweep then content fade-in
+  const _reveal  = panel.querySelector('.p-reveal');
+  const _sweep   = document.getElementById('panelSweep');
+  const _status  = document.getElementById('panelStatus');
+  _reveal.classList.remove('visible');
+  _sweep.classList.remove('active');
+  _status.classList.remove('active');
+  void _sweep.offsetWidth; // force reflow
+  _sweep.classList.add('active');
+  _status.classList.add('active');
+  setTimeout(() => _status.classList.remove('active'), 320);
+  setTimeout(() => _reveal.classList.add('visible'), 280);
+
+  highlightCountry(c.lat, c.lon);
   triggerCityScan(idx);
 
   if (!hintDone) {
@@ -2062,11 +3051,257 @@ function closePanel() {
   }
   if (localClockTimer) { clearInterval(localClockTimer); localClockTimer = null; }
   panel.classList.remove('open');
+  panel.querySelector('.p-reveal').classList.remove('visible');
+  _viewOffTarget = 0;
   selIdx = -1;
+  clearCountryHighlight();
   pinMeshes.forEach(p => { p.material.color.setHex(0xffffff); p.material.emissiveIntensity = 0.85; });
   refreshArcs(-1);
 }
 window.closePanel = closePanel;
+
+// ═══════════════════════════════════════════════════
+//  DIRECTORY
+// ═══════════════════════════════════════════════════
+function openDirectory() {
+  dirSortCol = 'id'; dirSortAsc = true;
+  document.getElementById('dirSearch').value = '';
+  renderDirTable('');
+  document.getElementById('directoryPanel').classList.add('open');
+  // Update sort header indicators
+  document.querySelectorAll('#dirTable thead th').forEach(th => th.classList.remove('dir-sorted'));
+  document.querySelector('#dirTable thead th[data-col="id"]').classList.add('dir-sorted');
+}
+function closeDirectory() {
+  document.getElementById('directoryPanel').classList.remove('open');
+}
+function renderDirTable(filter) {
+  const q = (filter || '').toLowerCase().trim();
+  let rows = CITIES.map((c, i) => ({ ...c, idx: i }));
+  if (q) {
+    rows = rows.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      c.country.toLowerCase().includes(q) ||
+      (CONTINENT[c.name] || '').toLowerCase().includes(q) ||
+      c.industries.some(ind => ind.toLowerCase().includes(q))
+    );
+  }
+  rows.sort((a, b) => {
+    let va, vb;
+    switch (dirSortCol) {
+      case 'id':        va = a.idx;              vb = b.idx;              break;
+      case 'name':      va = a.name;             vb = b.name;             break;
+      case 'country':   va = a.country;          vb = b.country;          break;
+      case 'continent': va = CONTINENT[a.name]||''; vb = CONTINENT[b.name]||''; break;
+      case 'agents':    va = a.agents.length;    vb = b.agents.length;    break;
+      case 'sectors':   va = a.industries.length;vb = b.industries.length;break;
+      default: va = a.idx; vb = b.idx;
+    }
+    if (typeof va === 'string') return dirSortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return dirSortAsc ? va - vb : vb - va;
+  });
+  document.getElementById('dirBody').innerHTML = rows.map(c => `
+    <tr onclick="selectFromDirectory(${c.idx})">
+      <td class="dir-node-id">NODE-${String(c.idx+1).padStart(3,'0')}</td>
+      <td class="dir-city-name">${c.name}</td>
+      <td>${c.country}</td>
+      <td>${CONTINENT[c.name] || '—'}</td>
+      <td><span class="dir-badge">${c.agents.length}</span></td>
+      <td>${c.industries.slice(0,2).join(', ')}${c.industries.length > 2 ? ' +' + (c.industries.length-2) : ''}</td>
+    </tr>`).join('');
+  const n = rows.length;
+  document.getElementById('dirFooterCount').textContent = n === CITIES.length ? `${n} nodes active` : `${n} / ${CITIES.length} nodes`;
+  document.getElementById('dirCountLabel').textContent = `// ${n} NODES`;
+}
+function selectFromDirectory(idx) {
+  closeDirectory();
+  const c = CITIES[idx];
+  // Compute target rotation so this city faces the camera
+  const _theta = (c.lon + 180) * Math.PI / 180;
+  gotoTarget = {
+    y: Math.PI / 2 - _theta,
+    x: Math.max(-Math.PI/2.8, Math.min(Math.PI/2.8, c.lat * Math.PI / 180 * 0.65))
+  };
+  openPanel(idx);
+}
+// Column sort
+document.querySelectorAll('#dirTable thead th').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (dirSortCol === col) dirSortAsc = !dirSortAsc;
+    else { dirSortCol = col; dirSortAsc = true; }
+    document.querySelectorAll('#dirTable thead th').forEach(h => h.classList.remove('dir-sorted'));
+    th.classList.add('dir-sorted');
+    renderDirTable(document.getElementById('dirSearch').value);
+  });
+});
+// Live search
+document.getElementById('dirSearch').addEventListener('input', e => {
+  renderDirTable(e.target.value);
+});
+// Close on backdrop click
+document.getElementById('directoryPanel').addEventListener('click', e => {
+  if (e.target === document.getElementById('directoryPanel')) closeDirectory();
+});
+// ESC closes directory
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeDirectory(); closeContact(); closeAccessPanel(); }
+});
+window.openDirectory  = openDirectory;
+window.closeDirectory = closeDirectory;
+window.selectFromDirectory = selectFromDirectory;
+
+// ── Access Panel ──
+function openAccessPanel()  { document.getElementById('accessPanel').classList.add('open'); }
+function closeAccessPanel() { document.getElementById('accessPanel').classList.remove('open'); }
+document.getElementById('accessPanel').addEventListener('click', e => {
+  if (e.target === document.getElementById('accessPanel')) closeAccessPanel();
+});
+window.openAccessPanel  = openAccessPanel;
+window.closeAccessPanel = closeAccessPanel;
+
+// ═══════════════════════════════════════════════════
+//  CONTACT MODAL
+// ═══════════════════════════════════════════════════
+// ── FORMSPREE CONFIG ──────────────────────────────────────
+// 1. Go to https://formspree.io  and create a free account
+// 2. Click "New Form", give it a name (e.g. "Lab 100 Intake")
+// 3. Copy the form ID from the endpoint URL (e.g. xpzgkqob)
+// 4. Paste it below — that's it, submissions hit your inbox.
+const FORMSPREE_ID = 'YOUR_FORM_ID';
+// ──────────────────────────────────────────────────────────
+
+let _cmodSvc = null;
+
+function openContact(agentName, agentRole, cityName) {
+  _cmodSvc = null;
+  document.getElementById('cmodAv').textContent   = initials(agentName);
+  document.getElementById('cmodName').textContent = agentName;
+  document.getElementById('cmodRole').textContent = agentRole;
+  document.getElementById('cmodCity').textContent = cityName;
+  // Reset card selection
+  document.querySelectorAll('.svc-card').forEach(c => c.classList.remove('selected'));
+  const btn = document.getElementById('svcSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = 'SELECT A SERVICE TO CONTINUE';
+  document.getElementById('contactModal').classList.add('open');
+}
+
+function closeContact() {
+  document.getElementById('contactModal').classList.remove('open');
+}
+
+function selectSvc(card) {
+  document.querySelectorAll('.svc-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  _cmodSvc = card.dataset.svc;
+  const titleMap = {
+    buyers:   'REQUEST BUYER SEARCH',
+    meeting:  'REQUEST MEETING SETUP',
+    intro:    'REQUEST INTRODUCTION',
+    partners: 'REQUEST PARTNER SOURCING',
+    intel:    'REQUEST MARKET INTEL',
+    deal:     'REQUEST DEAL SUPPORT'
+  };
+  const btn = document.getElementById('svcSubmitBtn');
+  btn.disabled = false;
+  btn.textContent = titleMap[_cmodSvc] || 'SUBMIT REQUEST';
+}
+
+function transmitContact() {
+  if (!_cmodSvc) return;
+
+  const agentName = document.getElementById('cmodName').textContent;
+  const svcLabel  = document.querySelector('.svc-card.selected .svc-title')?.textContent || _cmodSvc.toUpperCase();
+  const city      = document.getElementById('cmodCity').textContent;
+
+  // Seed the tx screen
+  document.getElementById('ctxAv').textContent    = document.getElementById('cmodAv').textContent;
+  document.getElementById('ctxStatus').textContent = 'INITIATING CHANNEL...';
+  document.getElementById('ctxLog').innerHTML      = '';
+  document.getElementById('ctxCheck').classList.remove('show');
+  document.getElementById('ctxDone').classList.remove('show');
+
+  // Show tx screen over the form
+  const tx = document.getElementById('cmodTxScreen');
+  tx.classList.add('active');
+
+  const logEl    = document.getElementById('ctxLog');
+  const statusEl = document.getElementById('ctxStatus');
+
+  const sequence = [
+    { delay: 200,  status: 'ENCRYPTING REQUEST...',     log: `▸ SERVICE: ${svcLabel}` },
+    { delay: 700,  status: 'LOCATING AGENT...',          log: `▸ AGENT: ${agentName}` },
+    { delay: 1200, status: 'ROUTING TO NODE...',         log: `▸ NODE: ${city.toUpperCase()}` },
+    { delay: 1700, status: 'RUNNING SECURITY CHECK...',   log: '▸ SECURITY: CLEARED' },
+    { delay: 2200, status: 'TRANSMITTING...',            log: '▸ PACKET SENT' },
+    { delay: 2700, status: 'CONNECTION ESTABLISHED',     log: null },
+  ];
+
+  sequence.forEach(({ delay, status, log }) => {
+    setTimeout(() => {
+      statusEl.textContent = status;
+      if (log) {
+        const line = document.createElement('div');
+        line.className = 'ctx-log-line';
+        line.textContent = log;
+        logEl.appendChild(line);
+      }
+    }, delay);
+  });
+
+  // Success state
+  setTimeout(() => {
+    document.getElementById('ctxCheck').classList.add('show');
+    document.getElementById('ctxDone').textContent = `REQUEST SENT TO ${agentName.split(' ')[0].toUpperCase()}`;
+    document.getElementById('ctxDone').classList.add('show');
+  }, 3100);
+
+  // Auto-close
+  setTimeout(() => {
+    closeContact();
+    setTimeout(() => tx.classList.remove('active'), 300);
+  }, 4800);
+}
+// Close contact on backdrop
+document.getElementById('contactModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('contactModal')) closeContact();
+});
+window.openContact     = openContact;
+window.closeContact    = closeContact;
+window.selectSvc       = selectSvc;
+window.transmitContact = transmitContact;
+
+function scrambleDecodeCountry(target) {
+  const el      = document.getElementById('panelCountry');
+  const chars   = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ·—';
+  const dur     = 1400;  // total decode duration ms
+  const fps     = 40;    // updates per second
+  const steps   = Math.round(dur / (1000 / fps));
+  let   frame   = 0;
+  el.classList.remove('decoded');
+  el.classList.add('decoding');
+  clearInterval(el._scramTimer);
+  el._scramTimer = setInterval(() => {
+    frame++;
+    const progress = frame / steps;           // 0 → 1
+    const resolved = Math.floor(progress * target.length);
+    let display = '';
+    for (let i = 0; i < target.length; i++) {
+      if (target[i] === ' ') { display += ' '; continue; }
+      display += i < resolved
+        ? target[i]
+        : chars[Math.floor(Math.random() * chars.length)];
+    }
+    el.textContent = display;
+    if (frame >= steps) {
+      clearInterval(el._scramTimer);
+      el.textContent = target;
+      el.classList.remove('decoding');
+      el.classList.add('decoded');
+    }
+  }, 1000 / fps);
+}
 
 function formatCoords(lat, lon) {
   const la = lat > 0 ? `${lat.toFixed(2)}° N` : `${Math.abs(lat).toFixed(2)}° S`;
@@ -2083,9 +3318,11 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   // Enforce mobile zoom — e.g. when rotating phone
-  if (window.innerWidth < 640 && camera.position.z < 20) camera.position.z = 22;
+  if (window.innerWidth < 640 && camera.position.z < 27) camera.position.z = 29;
   // Enforce desktop zoom when expanding back
-  if (window.innerWidth >= 640 && camera.position.z > 18) camera.position.z = 16;
+  if (window.innerWidth >= 640 && camera.position.z > 22) camera.position.z = 19;
+  // If panel is open but we resized to mobile, drop the horizontal offset
+  if (window.innerWidth < 640) { _viewOffX = 0; _viewOffTarget = 0; camera.clearViewOffset(); }
 });
 
 // ── Clock ──
@@ -2167,7 +3404,19 @@ const clock = new THREE.Clock();
   const t = clock.getElapsedTime();
 
   if (isDragging) {
-    // rotation applied directly in mousemove/touchmove
+    gotoTarget = null; // drag cancels any programmatic navigation
+  } else if (gotoTarget) {
+    // Smooth fly-to animation (e.g. from directory selection)
+    const _dy = gotoTarget.y - G.rotation.y;
+    const _dx = gotoTarget.x - G.rotation.x;
+    G.rotation.y += _dy * 0.10;
+    G.rotation.x += _dx * 0.10;
+    G.rotation.x = Math.max(-Math.PI/2.8, Math.min(Math.PI/2.8, G.rotation.x));
+    if (Math.abs(_dy) < 0.008 && Math.abs(_dx) < 0.008) {
+      G.rotation.y = gotoTarget.y;
+      G.rotation.x = gotoTarget.x;
+      gotoTarget = null; velX = 0; velY = 0;
+    }
   } else {
     // Apply velocity with momentum decay
     G.rotation.y += velY;
@@ -2186,6 +3435,42 @@ const clock = new THREE.Clock();
   atmoRim.material.opacity   = 0.022 + 0.008 * Math.sin(t * 0.55);   // face haze — near-zero
   atmoInner.material.opacity = 0.170 + 0.050 * Math.sin(t * 0.42 + 1.1); // rim breathing
   atmoMid.material.opacity   = 0.115 + 0.030 * Math.sin(t * 0.31 + 2.3); // mid corona
+
+  // Nav rings — gimbal system tracking globe orientation, follows view offset
+  const _fovR = camera.fov * Math.PI / 180;
+  const _projR = (GLOBE_R / camera.position.z) * (window.innerHeight / (2 * Math.tan(_fovR / 2)));
+  const _rCX  = (window.innerWidth / 2 - _viewOffX) + 'px';
+  const _dH   = _projR * 2 * 1.08;  // horizontal ring — hugs equator
+  const _dV   = _projR * 2 * 1.13;  // vertical ring — slightly outside
+  // Horizontal ring: lies flat (rotateX(78deg)), node angle = yaw
+  ringH.style.left      = _rCX;
+  ringH.style.width     = _dH + 'px';
+  ringH.style.height    = _dH + 'px';
+  ringH.style.transform = `translate(-50%,-50%) perspective(900px) rotateX(78deg)`;
+  ringHArm.style.transform = `rotate(${G.rotation.y.toFixed(4)}rad)`;
+  // Vertical ring: stands upright (slight rotateY for depth), node angle = pitch
+  ringV.style.left      = _rCX;
+  ringV.style.width     = _dV + 'px';
+  ringV.style.height    = _dV + 'px';
+  ringV.style.transform = `translate(-50%,-50%) perspective(900px) rotateY(8deg)`;
+  ringVArm.style.transform = `rotate(${G.rotation.x.toFixed(4)}rad)`;
+
+  // Orient HUD — lower-left scan lines
+  const _pitchRad = G.rotation.x;
+  const _yawRad   = G.rotation.y;
+  const _pitchMax = Math.PI / 2.8;
+  const _pn = Math.min(1, Math.max(0, (_pitchRad + _pitchMax) / (2 * _pitchMax)));
+  const _yn = ((_yawRad % (2*Math.PI)) + 2*Math.PI) % (2*Math.PI) / (2*Math.PI);
+  const _pPct = (_pn * 100).toFixed(1) + '%';
+  const _yPct = (_yn * 100).toFixed(1) + '%';
+  ohudPDot.style.top    = _pPct;
+  ohudYDot.style.top    = _yPct;
+  ohudPFill.style.height = _pPct;
+  ohudYFill.style.height = _yPct;
+  const _pd = (_pitchRad * 180 / Math.PI);
+  const _yd = ((_yawRad * 180 / Math.PI) % 360);
+  ohudPVal.textContent = (_pd >= 0 ? '+' : '') + _pd.toFixed(0) + '°';
+  ohudYVal.textContent = (_yd >= 0 ? '+' : '') + _yd.toFixed(0) + '°';
 
   // Scan sweep — independent of globe rotation
   scanLine.rotation.y = t * 0.22;
@@ -2282,6 +3567,15 @@ const clock = new THREE.Clock();
     }
   } else {
     reticleEl.className = '';
+  }
+
+  // Animate globe horizontal offset when panel opens/closes (desktop only)
+  if (Math.abs(_viewOffX - _viewOffTarget) > 0.3) {
+    _viewOffX += (_viewOffTarget - _viewOffX) * 0.07;
+    camera.setViewOffset(window.innerWidth, window.innerHeight, _viewOffX, 0, window.innerWidth, window.innerHeight);
+  } else if (_viewOffX !== _viewOffTarget) {
+    _viewOffX = _viewOffTarget;
+    _viewOffTarget === 0 ? camera.clearViewOffset() : camera.setViewOffset(window.innerWidth, window.innerHeight, _viewOffX, 0, window.innerWidth, window.innerHeight);
   }
 
   renderer.render(scene, camera);

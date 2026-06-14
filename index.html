@@ -1364,7 +1364,7 @@ body.pin-hover { cursor: crosshair; }
   #ticker { display: none; }
   .hud-corner { display: none; }
 
-  #hint { font-size: 7px; letter-spacing: 2px; }
+  #hint { font-size: 7px; letter-spacing: 2px; top: 82px; }
 
   /* Panel — bottom sheet on mobile, leaves globe visible above */
   #cityPanel {
@@ -1455,6 +1455,15 @@ body.pin-hover { cursor: crosshair; }
 .sct-name   { color: #00c8ff; font-size: 9px; letter-spacing: 2px; }
 .sct-time   { color: rgba(0,200,255,0.58); font-size: 7.5px; }
 .sct-coords { color: rgba(0,200,255,0.32); font-size: 6.5px; }
+
+/* Hide sector bar + agent HUD elements when mobile panel is open */
+@media (max-width: 1024px) {
+  body.panel-open #sectorBar        { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.2s; }
+  body.panel-open #orientHUD        { opacity: 0 !important; transition: opacity 0.2s; }
+  body.panel-open #scanHUD          { opacity: 0 !important; transition: opacity 0.2s; }
+  body.panel-open #agentToggleBtn   { opacity: 0 !important; pointer-events: none !important; }
+  body.panel-open #sectorFlash      { opacity: 0 !important; }
+}
 
 /* ── Sector Filter Bar ── */
 #sectorBar {
@@ -1572,6 +1581,29 @@ body.pin-hover { cursor: crosshair; }
   text-align: left;
 }
 #agentHoverCard.vis { opacity: 1; }
+/* On touch devices the card becomes tappable */
+#agentHoverCard.touch-card {
+  pointer-events: all;
+  cursor: pointer;
+}
+.ahc-open-btn {
+  display: block;
+  width: 100%;
+  margin-top: 9px;
+  padding: 5px 0;
+  background: rgba(255,120,0,0.12);
+  border: 1px solid rgba(255,140,0,0.45);
+  color: rgba(255,160,0,0.90);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 7px; letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s;
+}
+.ahc-open-btn:hover, .ahc-open-btn:active {
+  background: rgba(255,120,0,0.25);
+}
 .ahc-city {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 6px; letter-spacing: 2.5px;
@@ -1613,12 +1645,16 @@ body.pin-hover { cursor: crosshair; }
   opacity: 0; transition: opacity 0.45s;
 }
 #sectorFlash.vis { opacity: 1; }
+@media (max-width: 1024px) {
+  /* Mobile header is 70px tall (2 rows) — push flash below it */
+  #sectorFlash { top: 80px; font-size: 7.5px; letter-spacing: 3px; }
+}
 
 /* Agent mode toggle — fixed above scan HUD */
 #agentToggleBtn {
   position: fixed;
   right: 18px;
-  bottom: 300px;
+  bottom: 340px;
   z-index: 20;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 7px;
@@ -3283,6 +3319,8 @@ function toggleAgentMode() {
   }
 }
 window.toggleAgentMode = toggleAgentMode;
+// expose _ahcIdx for inline onclick in agent card
+Object.defineProperty(window, '_ahcIdx', { get: () => _ahcIdx, set: v => { _ahcIdx = v; } });
 
 function updateAgentHoverCard() {
   const card = document.getElementById('agentHoverCard');
@@ -4261,31 +4299,27 @@ canvas.addEventListener('touchend', e => {
     if (hits.length) {
       const ci = hits[0].object.userData.cityIdx;
       if (_agentMode) {
-        // In agent mode: first tap shows agent card, second tap on same city opens panel
+        // Agent mode: show tappable card at the tap position
         const card = document.getElementById('agentHoverCard');
-        if (_ahcIdx === ci && card.classList.contains('vis')) {
-          openPanel(ci);
-        } else {
-          // Position card at tap point
-          hitMeshes[ci].getWorldPosition(_aModeVec);
-          const v = _aModeVec.clone().project(camera);
-          const x = (v.x + 1) / 2 * window.innerWidth;
-          const y = (-v.y + 1) / 2 * window.innerHeight;
-          card.style.left = x + 'px';
-          card.style.top  = y + 'px';
-          const city = CITIES[ci];
-          card.innerHTML = `<div class="ahc-city">${city.name} // NODE-${String(ci+1).padStart(3,'0')}</div>`
-            + city.agents.map(a => `<div class="ahc-agent"><span class="ahc-name">${a.n}</span><span class="ahc-role">${a.r}</span></div>`).join('')
-            + `<div style="margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:6.5px;letter-spacing:2px;color:rgba(255,140,0,0.55);text-align:center;">TAP AGAIN TO OPEN CITY</div>`;
-          _ahcIdx = ci;
-          card.classList.add('vis');
-        }
+        const city = CITIES[ci];
+        // Clamp card so it stays on screen
+        const cardX = Math.min(tx, window.innerWidth  - 160);
+        const cardY = Math.max(ty, 100);
+        card.style.left      = cardX + 'px';
+        card.style.top       = cardY + 'px';
+        card.style.transform = 'translate(-50%, calc(-100% - 14px))';
+        card.innerHTML = `<div class="ahc-city">${city.name} // NODE-${String(ci+1).padStart(3,'0')}</div>`
+          + city.agents.map(a => `<div class="ahc-agent"><span class="ahc-name">${a.n}</span><span class="ahc-role">${a.r}</span></div>`).join('')
+          + `<button class="ahc-open-btn" onclick="document.getElementById('agentHoverCard').classList.remove('vis','touch-card');_ahcIdx=-1;openPanel(${ci})">OPEN CITY PROFILE</button>`;
+        _ahcIdx = ci;
+        card.classList.add('vis', 'touch-card');
       } else {
         openPanel(ci);
       }
     } else if (_agentMode) {
       // Tap on empty space dismisses card
-      document.getElementById('agentHoverCard').classList.remove('vis');
+      const card = document.getElementById('agentHoverCard');
+      card.classList.remove('vis', 'touch-card');
       _ahcIdx = -1;
     }
   }
@@ -4436,6 +4470,7 @@ function openPanel(idx) {
     </div>`).join('');
 
   panel.classList.add('open');
+  document.body.classList.add('panel-open');
 
   // Shift globe left on desktop so panel doesn't cover it
   if (window.innerWidth >= 1024) _viewOffTarget = 200;
@@ -4476,6 +4511,7 @@ function closePanel() {
   }
   if (localClockTimer) { clearInterval(localClockTimer); localClockTimer = null; }
   panel.classList.remove('open');
+  document.body.classList.remove('panel-open');
   panel.querySelector('.p-reveal').classList.remove('visible');
   _viewOffTarget = 0;
   selIdx = -1;

@@ -1351,6 +1351,99 @@ body.pin-hover { cursor: crosshair; }
   z-index: 1;
   opacity: 0.045;
 }
+
+/* ── Scan Paint overlay UI ── */
+.scan-panel {
+  position: fixed;
+  top: 82px;
+  left: 22px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 1.8px;
+  color: rgba(0,200,255,0.75);
+  pointer-events: none;
+  z-index: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  opacity: 0;
+  transition: opacity 0.35s;
+  min-width: 188px;
+}
+.scan-panel.vis { opacity: 1; }
+.scan-panel-hdr { color: #00c8ff; font-size: 8px; letter-spacing: 2.5px; margin-bottom: 1px; }
+.scan-panel-row { display: flex; justify-content: space-between; gap: 18px; }
+.sp-key { color: rgba(0,200,255,0.42); }
+.sp-val { color: rgba(255,255,255,0.86); }
+.scan-hex {
+  font-size: 7px;
+  color: rgba(0,200,255,0.25);
+  letter-spacing: 1px;
+  word-break: break-all;
+  line-height: 1.6;
+  height: 38px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+.scan-div { height: 1px; background: rgba(0,200,255,0.18); margin: 1px 0; }
+.scan-city-tag {
+  position: fixed;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 1.8px;
+  pointer-events: none;
+  z-index: 600;
+  opacity: 1;
+  transition: opacity 0.38s;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-transform: uppercase;
+  border-left: 1px solid rgba(0,200,255,0.35);
+  padding-left: 9px;
+}
+.scan-city-tag.fade { opacity: 0; }
+.sct-name   { color: #00c8ff; font-size: 9px; letter-spacing: 2px; }
+.sct-time   { color: rgba(0,200,255,0.58); font-size: 7.5px; }
+.sct-coords { color: rgba(0,200,255,0.32); font-size: 6.5px; }
+.scan-lock-splash {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 700;
+  gap: 10px;
+  opacity: 0;
+  transition: opacity 0.18s;
+}
+.scan-lock-splash.vis { opacity: 1; }
+.scan-lock-splash.fade { opacity: 0; transition: opacity 0.55s; }
+.sls-line1 {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: clamp(11px, 1.5vw, 18px);
+  letter-spacing: 6px;
+  color: rgba(0,200,255,0.45);
+  text-transform: uppercase;
+}
+.sls-line2 {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: clamp(22px, 4vw, 42px);
+  letter-spacing: 10px;
+  color: #00c8ff;
+  text-transform: uppercase;
+  text-shadow: 0 0 28px rgba(0,200,255,0.7), 0 0 60px rgba(0,200,255,0.3);
+}
+.sls-line3 {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: clamp(8px, 1vw, 11px);
+  letter-spacing: 4px;
+  color: rgba(0,200,255,0.35);
+  text-transform: uppercase;
+  margin-top: 4px;
+}
 </style>
 </head>
 <body>
@@ -3116,6 +3209,435 @@ function glitchLatLon() {
 }
 
 // ═══════════════════════════════════════════════════
+//  HOLOGRAM ASSEMBLE — INTRO ANIMATION
+// ═══════════════════════════════════════════════════
+function runIntroAnimation() {
+  const CONVERGE_DUR = 2200;   // ms — particles converge
+  const FLASH_DUR    = 550;    // ms — flash settle after lock
+  const N_PARTICLES  = 80;
+
+  // Globe invisible until lock
+  globeMat.transparent = true;
+  globeMat.opacity = 0;
+
+  // Collect grid line materials & boost brightness 5×
+  const gridMats = [];
+  G.children.forEach(c => {
+    if (c.isLine && c.material) {
+      const origOp = c.material.opacity;
+      c.material.transparent = true;
+      const boosted = Math.min(1.0, origOp * 5);
+      c.material.opacity = boosted;
+      gridMats.push({ mat: c.material, origOp, boosted });
+    }
+  });
+
+  // Hide pins and rings — pins get scale=0 for spring-in later
+  pinMeshes.forEach(p => { p.visible = false; p.scale.setScalar(0); });
+  ringData.forEach(r => { r.mesh.visible = false; });
+
+  // ── Particle system (scene-level, not inside G) ──
+  const posArr = new Float32Array(N_PARTICLES * 3);
+  const localTargets = [];   // on-globe target in G local coords
+  for (let i = 0; i < N_PARTICLES; i++) {
+    // Surface target (local space)
+    const phi   = Math.acos(2 * Math.random() - 1);
+    const theta = Math.random() * Math.PI * 2;
+    localTargets.push(new THREE.Vector3(
+      GLOBE_R * Math.sin(phi) * Math.cos(theta),
+      GLOBE_R * Math.sin(phi) * Math.sin(theta),
+      GLOBE_R * Math.cos(phi)
+    ));
+    // Scattered start (world space, 1.5-2.8× radius)
+    const r   = GLOBE_R * (1.5 + Math.random() * 1.3);
+    const sp  = Math.acos(2 * Math.random() - 1);
+    const st  = Math.random() * Math.PI * 2;
+    posArr[i*3]   = r * Math.sin(sp) * Math.cos(st);
+    posArr[i*3+1] = r * Math.sin(sp) * Math.sin(st);
+    posArr[i*3+2] = r * Math.cos(sp);
+  }
+  const startPos = posArr.slice();
+  const ptGeo  = new THREE.BufferGeometry();
+  ptGeo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+  const ptMat  = new THREE.PointsMaterial({ color: 0x00c8ff, size: 0.13, transparent: true, opacity: 0.85, depthWrite: false });
+  const ptMesh = new THREE.Points(ptGeo, ptMat);
+  scene.add(ptMesh);
+
+  // ── Ripple ring (equatorial plane, world space) ──
+  const ripPts = [];
+  for (let i = 0; i <= 96; i++) {
+    const a = i / 96 * Math.PI * 2;
+    ripPts.push(new THREE.Vector3(Math.cos(a), 0, Math.sin(a)));
+  }
+  const ripGeo  = new THREE.BufferGeometry().setFromPoints(ripPts);
+  const ripMat  = new THREE.LineBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: 0, depthWrite: false });
+  const ripMesh = new THREE.Line(ripGeo, ripMat);
+  ripMesh.scale.setScalar(GLOBE_R);
+  scene.add(ripMesh);
+
+  // ── Easing ──
+  function easeInOut(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+  function easeOutBack(t) { const c=2.70158; return 1+(c+1)*Math.pow(t-1,3)+c*Math.pow(t-1,2); }
+
+  // ── Animation loop ──
+  _introPlaying = true;
+  let phase = 0;
+  let phaseStart = performance.now();
+  const _tmp = new THREE.Vector3();
+
+  function animTick(now) {
+    const elapsed = now - phaseStart;
+
+    if (phase === 0) {
+      // PHASE 0 — particles converge to globe surface
+      const pct = Math.min(elapsed / CONVERGE_DUR, 1.0);
+      const te  = easeInOut(pct);
+      const pa  = ptGeo.attributes.position.array;
+      for (let i = 0; i < N_PARTICLES; i++) {
+        _tmp.copy(localTargets[i]).applyQuaternion(G.quaternion);  // world space target (globe rotating)
+        pa[i*3]   = startPos[i*3]   + (_tmp.x - startPos[i*3])   * te;
+        pa[i*3+1] = startPos[i*3+1] + (_tmp.y - startPos[i*3+1]) * te;
+        pa[i*3+2] = startPos[i*3+2] + (_tmp.z - startPos[i*3+2]) * te;
+      }
+      ptGeo.attributes.position.needsUpdate = true;
+
+      if (pct >= 1.0) {
+        phase = 1;
+        phaseStart = now;
+        // Globe flash-in
+        globeMat.opacity = 1.0;
+        globeMat.emissiveIntensity = 4.0;
+        // Ripple activate
+        ripMat.opacity = 0.9;
+        // Pins spring in with stagger
+        pinMeshes.forEach((p, i) => {
+          p.visible = true;
+          p.scale.setScalar(0);
+          setTimeout(() => {
+            const pS = performance.now(); const PIN_DUR = 380;
+            function pinTick(pN) {
+              const pp = Math.min((pN - pS) / PIN_DUR, 1.0);
+              p.scale.setScalar(Math.max(0, easeOutBack(pp)));
+              if (pp < 1.0) requestAnimationFrame(pinTick);
+              else p.scale.setScalar(1);
+            }
+            requestAnimationFrame(pinTick);
+          }, i * 14);
+        });
+        // Rings stagger after pins
+        ringData.forEach((r, i) => setTimeout(() => { r.mesh.visible = true; }, 700 + i * 16));
+      }
+    } else if (phase === 1) {
+      // PHASE 1 — flash settle, grid dim, particles/ripple fade
+      const pct = Math.min(elapsed / FLASH_DUR, 1.0);
+      const te  = easeInOut(pct);
+      globeMat.emissiveIntensity = 4.0 - (4.0 - 1.35) * te;
+      gridMats.forEach(gm => { gm.mat.opacity = gm.boosted + (gm.origOp - gm.boosted) * te; });
+      ptMat.opacity = 0.85 * (1 - pct);
+      ripMesh.scale.setScalar(GLOBE_R * (1.0 + pct * 1.0));
+      ripMat.opacity = 0.9 * (1 - pct);
+
+      if (pct >= 1.0) {
+        // Cleanup
+        scene.remove(ptMesh);  ptGeo.dispose();  ptMat.dispose();
+        scene.remove(ripMesh); ripGeo.dispose(); ripMat.dispose();
+        globeMat.transparent = false;
+        globeMat.emissiveIntensity = 1.35;
+        gridMats.forEach(gm => { gm.mat.opacity = gm.origOp; });
+        _introPlaying = false;
+        return;
+      }
+    }
+    requestAnimationFrame(animTick);
+  }
+  requestAnimationFrame(animTick);
+}
+
+// ═══════════════════════════════════════════════════
+//  SCAN PAINT — INTRO ANIMATION  (Enhanced)
+// ═══════════════════════════════════════════════════
+function runScanPaintAnimation() {
+  const SCAN_DUR   = 4200;   // ms — scan sweep
+  const SETTLE_DUR = 700;    // ms — flash settle
+  const _SC = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/#><@!';
+
+  // ── Scramble-resolve text helper ──
+  function scrambleResolve(el, finalText, dur) {
+    const t0 = performance.now();
+    function tick(now) {
+      const p = Math.min((now - t0) / dur, 1.0);
+      const nResolved = Math.floor(p * finalText.length);
+      el.textContent = finalText.split('').map((c, i) => {
+        if (' .,°:/°'.includes(c)) return c;
+        if (i < nResolved) return c;
+        return _SC[Math.floor(Math.random() * _SC.length)];
+      }).join('');
+      if (p < 1.0) requestAnimationFrame(tick);
+      else el.textContent = finalText;
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // ── Scan status panel (left side) ──
+  const scanPanel = document.createElement('div');
+  scanPanel.className = 'scan-panel';
+  scanPanel.innerHTML = `
+    <div class="scan-panel-hdr">// SCANNING NETWORK</div>
+    <div class="scan-div"></div>
+    <div class="scan-panel-row"><span class="sp-key">LATITUDE</span><span class="sp-val" id="_spLat">90.0° N</span></div>
+    <div class="scan-panel-row"><span class="sp-key">NODES</span><span class="sp-val" id="_spNodes">000 / 100</span></div>
+    <div class="scan-panel-row"><span class="sp-key">STATUS</span><span class="sp-val" id="_spStatus">SCANNING</span></div>
+    <div class="scan-div"></div>
+    <div class="scan-hex" id="_spHex"></div>
+  `;
+  document.body.appendChild(scanPanel);
+  requestAnimationFrame(() => scanPanel.classList.add('vis'));
+
+  const _spLat    = document.getElementById('_spLat');
+  const _spNodes  = document.getElementById('_spNodes');
+  const _spStatus = document.getElementById('_spStatus');
+  const _spHex    = document.getElementById('_spHex');
+
+  // Scrolling hex data in the panel
+  let _hexLines = [];
+  const _hexIv = setInterval(() => {
+    const row = Array.from({length: 10}, () =>
+      Math.floor(Math.random()*65536).toString(16).padStart(4,'0').toUpperCase()
+    ).join(' ');
+    _hexLines.unshift(row);
+    if (_hexLines.length > 4) _hexLines.pop();
+    _spHex.textContent = _hexLines.join('\n');
+  }, 70);
+
+  // ── Cities sorted north→south for scan trigger ──
+  const sortedCities  = [...CITIES].sort((a, b) => b.lat - a.lat);
+  let   nextCityIdx   = 0;
+  let   nodesFound    = 0;
+  let   lastFlashTime = 0;
+  const FLASH_GAP     = 100;  // ms min between city tags
+
+  function triggerCityFlash(city) {
+    const h   = getCityHour(city);
+    const hh  = String(h).padStart(2,'0');
+    const mm  = String(new Date().getMinutes()).padStart(2,'0');
+    const la  = city.lat >= 0 ? `${city.lat.toFixed(1)}°N` : `${Math.abs(city.lat).toFixed(1)}°S`;
+    const lo  = city.lon >= 0 ? `${city.lon.toFixed(1)}°E` : `${Math.abs(city.lon).toFixed(1)}°W`;
+
+    const tag = document.createElement('div');
+    tag.className = 'scan-city-tag';
+    // West hemisphere → left side; east → right side
+    if (city.lon < 0) {
+      tag.style.left  = `${6 + Math.random() * 12}%`;
+    } else {
+      tag.style.right = `${3 + Math.random() * 12}%`;
+    }
+    tag.style.top = `${14 + Math.random() * 66}%`;
+    tag.innerHTML = `
+      <div class="sct-name">${city.name.toUpperCase()}</div>
+      <div class="sct-time">${hh}:${mm} LOCAL</div>
+      <div class="sct-coords">${la} / ${lo}</div>
+    `;
+    document.body.appendChild(tag);
+    // Scramble-resolve the city name
+    scrambleResolve(tag.querySelector('.sct-name'), city.name.toUpperCase(), 280);
+    setTimeout(() => tag.classList.add('fade'), 1100);
+    setTimeout(() => tag.remove(), 1550);
+  }
+
+  // ── Enable clipping ──
+  renderer.localClippingEnabled = true;
+  // Keep y >= -constant visible. Start constant = -GLOBE_R-0.05 → show nothing
+  const clipPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -GLOBE_R - 0.05);
+  globeMat.clippingPlanes = [clipPlane];
+  globeMat.transparent    = true;
+
+  const gridMats = [];
+  G.children.forEach(c => {
+    if (c.isLine && c.material) {
+      c.material.clippingPlanes = [clipPlane];
+      gridMats.push(c.material);
+    }
+  });
+
+  pinMeshes.forEach(p => { p.visible = false; p.scale.setScalar(0); });
+  ringData.forEach(r => { r.mesh.visible = false; });
+
+  // ── 3D Scan rings ──
+  const ringPts = [];
+  for (let i = 0; i <= 128; i++) {
+    const a = i / 128 * Math.PI * 2;
+    ringPts.push(new THREE.Vector3(Math.cos(a), 0, Math.sin(a)));
+  }
+  const ringGeo   = new THREE.BufferGeometry().setFromPoints(ringPts);
+
+  // Inner bright ring
+  const scanMat   = new THREE.LineBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: 0.95, depthWrite: false });
+  const scanMesh  = new THREE.Line(ringGeo, scanMat);
+  scene.add(scanMesh);
+
+  // Outer glow ring (wider radius)
+  const outerMat  = new THREE.LineBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: 0.25, depthWrite: false });
+  const outerMesh = new THREE.Line(ringGeo, outerMat);
+  scene.add(outerMesh);
+
+  // Trailing fade rings above scan line
+  const trailMeshes = [];
+  for (let t = 1; t <= 3; t++) {
+    const tMat  = new THREE.LineBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: 0.36 / t, depthWrite: false });
+    const tMesh = new THREE.Line(ringGeo, tMat);
+    scene.add(tMesh);
+    trailMeshes.push({ mesh: tMesh, mat: tMat, gap: t * 0.36 });
+  }
+
+  // Flash burst ring at completion
+  const flashGeo  = new THREE.BufferGeometry().setFromPoints(ringPts.map(v => v.clone()));
+  const flashMat  = new THREE.LineBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: 0, depthWrite: false });
+  const flashMesh = new THREE.Line(flashGeo, flashMat);
+  flashMesh.position.y = -GLOBE_R;
+  scene.add(flashMesh);
+
+  // ── Helpers ──
+  function easeInOut(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+  function easeOutBack(t) { const c=2.70158; return 1+(c+1)*Math.pow(t-1,3)+c*Math.pow(t-1,2); }
+  function crossR(y) { return Math.sqrt(Math.max(0.001, GLOBE_R*GLOBE_R - y*y)); }
+
+  function placeScanRings(y) {
+    const r = crossR(y);
+    scanMesh.scale.setScalar(r);
+    scanMesh.position.y = y;
+    outerMesh.scale.setScalar(r + 0.28);
+    outerMesh.position.y = y;
+    trailMeshes.forEach(tr => {
+      const ty = Math.min(y + tr.gap, GLOBE_R);
+      tr.mesh.scale.setScalar(crossR(ty));
+      tr.mesh.position.y = ty;
+    });
+  }
+
+  // ── Animation loop ──
+  _introPlaying = true;
+  let phase = 0;
+  let phaseStart = performance.now();
+
+  function animTick(now) {
+    const elapsed = now - phaseStart;
+
+    if (phase === 0) {
+      // PHASE 0 — scan sweeps top→bottom
+      const pct   = Math.min(elapsed / SCAN_DUR, 1.0);
+      const scanY = GLOBE_R * (1.0 - 2.0 * easeInOut(pct));
+      const curLat = Math.asin(Math.max(-1, Math.min(1, scanY / GLOBE_R))) * 180 / Math.PI;
+
+      clipPlane.constant = -scanY;
+      placeScanRings(scanY);
+
+      // Update scan panel readout
+      const latStr = curLat >= 0
+        ? `${curLat.toFixed(1)}° N`
+        : `${Math.abs(curLat).toFixed(1)}° S`;
+      _spLat.textContent   = latStr;
+      _spNodes.textContent = `${String(nodesFound).padStart(3,'0')} / 100`;
+
+      // Trigger city flash tags as scan passes each latitude
+      while (nextCityIdx < sortedCities.length && sortedCities[nextCityIdx].lat >= curLat) {
+        nodesFound++;
+        if (now - lastFlashTime > FLASH_GAP && Math.random() > 0.25) {
+          triggerCityFlash(sortedCities[nextCityIdx]);
+          lastFlashTime = now;
+        }
+        nextCityIdx++;
+      }
+
+      if (pct >= 1.0) {
+        phase = 1;
+        phaseStart = now;
+
+        // Remove clip planes — globe fully revealed
+        globeMat.clippingPlanes = [];
+        globeMat.transparent    = false;
+        gridMats.forEach(m => { m.clippingPlanes = []; });
+        renderer.localClippingEnabled = false;
+
+        // Globe emissive flash
+        globeMat.emissiveIntensity = 4.0;
+
+        // Flash ring burst at bottom
+        flashMesh.scale.setScalar(crossR(-GLOBE_R));
+        flashMat.opacity = 1.0;
+
+        // Panel: lock complete
+        clearInterval(_hexIv);
+        _spLat.textContent    = '90.0° S';
+        _spNodes.textContent  = '100 / 100';
+        _spHex.textContent    = '';
+        _spStatus.style.color = '#00e676';
+        scrambleResolve(_spStatus, 'LOCK COMPLETE', 420);
+
+        // ── Big centred lock splash ──
+        const splash = document.createElement('div');
+        splash.className = 'scan-lock-splash';
+        splash.innerHTML = `
+          <div class="sls-line1">// network scan complete</div>
+          <div class="sls-line2" id="_slsMain">LAB&nbsp;100&nbsp;ONLINE</div>
+          <div class="sls-line3">100 nodes · 100 cities · global coverage</div>
+        `;
+        document.body.appendChild(splash);
+        requestAnimationFrame(() => splash.classList.add('vis'));
+        scrambleResolve(document.getElementById('_slsMain'), 'LAB 100 ONLINE', 500);
+        // Fade out after 1.8s, then remove
+        setTimeout(() => splash.classList.replace('vis','fade'), 1800);
+        setTimeout(() => splash.remove(), 2400);
+
+        // Pins spring in staggered
+        pinMeshes.forEach((p, i) => {
+          p.visible = true;
+          p.scale.setScalar(0);
+          setTimeout(() => {
+            const pS = performance.now(); const PIN_DUR = 380;
+            function pinTick(pN) {
+              const pp = Math.min((pN - pS) / PIN_DUR, 1.0);
+              p.scale.setScalar(Math.max(0, easeOutBack(pp)));
+              if (pp < 1.0) requestAnimationFrame(pinTick);
+              else p.scale.setScalar(1);
+            }
+            requestAnimationFrame(pinTick);
+          }, i * 14);
+        });
+        ringData.forEach((r, i) => setTimeout(() => { r.mesh.visible = true; }, 700 + i * 16));
+      }
+
+    } else if (phase === 1) {
+      // PHASE 1 — settle & cleanup
+      const pct = Math.min(elapsed / SETTLE_DUR, 1.0);
+      const te  = easeInOut(pct);
+
+      globeMat.emissiveIntensity = 4.0 - (4.0 - 1.35) * te;
+      scanMat.opacity   = 0.95 * (1 - pct);
+      outerMat.opacity  = 0.25 * (1 - pct);
+      trailMeshes.forEach((tr, ti) => { tr.mat.opacity = (0.36/(ti+1)) * (1-pct); });
+      flashMesh.scale.setScalar(crossR(-GLOBE_R) * (1.0 + pct * 2.4));
+      flashMat.opacity = 1.0 * (1 - pct);
+
+      // Fade panel out in second half
+      if (pct > 0.45) scanPanel.style.opacity = String(1 - (pct - 0.45) / 0.55);
+
+      if (pct >= 1.0) {
+        scene.remove(scanMesh); scene.remove(outerMesh);
+        trailMeshes.forEach(tr => { scene.remove(tr.mesh); tr.mat.dispose(); });
+        ringGeo.dispose(); scanMat.dispose(); outerMat.dispose();
+        scene.remove(flashMesh); flashGeo.dispose(); flashMat.dispose();
+        scanPanel.remove();
+        globeMat.emissiveIntensity = 1.35;
+        _introPlaying = false;
+        return;
+      }
+    }
+    requestAnimationFrame(animTick);
+  }
+  requestAnimationFrame(animTick);
+}
+
+// ═══════════════════════════════════════════════════
 //  BOOT SEQUENCE
 // ═══════════════════════════════════════════════════
 pinMeshes.forEach(p => { p.visible = false; });
@@ -3123,8 +3645,7 @@ ringData.forEach(r => { r.mesh.visible = false; });
 setTimeout(() => {
   const ov = document.getElementById('bootOverlay');
   if (ov) { ov.classList.add('fade-out'); setTimeout(() => ov.remove(), 900); }
-  pinMeshes.forEach((p, i) => setTimeout(() => { p.visible = true; }, i * 18));
-  ringData.forEach((r, i) => setTimeout(() => { r.mesh.visible = true; }, 1800 + i * 18));
+  runScanPaintAnimation();
 }, 2300);
 
 // ── Lat/lon from globe surface ──
@@ -3152,6 +3673,7 @@ function fmtCoords(lat, lon) {
 //  ROTATION — Drag with momentum + auto-rotate
 // ═══════════════════════════════════════════════════
 let isDragging = false;
+let _introPlaying = false;
 let velX = 0, velY = 0;
 let prevMX = 0, prevMY = 0;
 let lastDX = 0, lastDY = 0;
@@ -3883,7 +4405,7 @@ const clock = new THREE.Clock();
 
     // Resume gentle auto-rotate once momentum fades
     if (Math.abs(velX) < RESUME && Math.abs(velY) < RESUME) {
-      G.rotation.y += AUTO_SPD;
+      G.rotation.y += _introPlaying ? AUTO_SPD * 0.25 : AUTO_SPD;
     }
   }
 

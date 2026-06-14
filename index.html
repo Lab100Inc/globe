@@ -105,8 +105,8 @@ canvas {
 /* ── DIRECTORY BUTTON (header) ── */
 .dir-nav-btn {
   background: transparent;
-  border: 1px solid var(--border);
-  color: var(--white-30);
+  border: 1px solid rgba(0,200,255,0.28);
+  color: rgba(255,255,255,0.58);
   font-family: 'IBM Plex Mono', monospace;
   font-size: 8px;
   letter-spacing: 2px;
@@ -119,12 +119,12 @@ canvas {
 }
 .dir-nav-btn:hover { border-color: var(--cyan); color: var(--cyan); }
 .h-access-btn {
-  background: var(--cyan);
-  border: 1px solid var(--cyan);
-  color: #000;
+  background: transparent;
+  border: 1px solid rgba(0,200,255,0.45);
+  color: rgba(0,200,255,0.75);
   font-family: 'IBM Plex Mono', monospace;
   font-size: 8px;
-  font-weight: 600;
+  font-weight: 400;
   letter-spacing: 2px;
   padding: 6px 14px;
   cursor: pointer;
@@ -135,8 +135,9 @@ canvas {
   transition: all 0.18s;
 }
 .h-access-btn:hover {
-  background: transparent;
+  border-color: var(--cyan);
   color: var(--cyan);
+  background: rgba(0,200,255,0.06);
 }
 /* h-access-btn visible on mobile via 2-row header layout */
 
@@ -218,6 +219,47 @@ canvas {
   font-size: 8px; letter-spacing: 2px; color: var(--white-30);
   display: flex; justify-content: space-between; flex-shrink: 0;
 }
+/* ── DIR TABS ── */
+.dir-tabs {
+  display: flex; gap: 0; flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+.dir-tab {
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border);
+  color: rgba(255,255,255,0.32);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 7.5px; letter-spacing: 2px;
+  padding: 5px 14px;
+  cursor: pointer; text-transform: uppercase;
+  transition: color 0.15s, background 0.15s;
+}
+.dir-tab:last-child { border-right: none; }
+.dir-tab:hover { color: var(--cyan); background: rgba(0,200,255,0.04); }
+.dir-tab.active { color: var(--cyan); background: rgba(0,200,255,0.08); }
+/* agent table mirrors dirTable */
+#agentTable { width: 100%; border-collapse: collapse; font-family: 'IBM Plex Mono', monospace; font-size: 10px; }
+#agentTable thead th {
+  text-align: left; padding: 10px 16px;
+  font-size: 8px; letter-spacing: 2px; color: var(--white-30);
+  border-bottom: 1px solid var(--border); cursor: pointer;
+  user-select: none; white-space: nowrap;
+  position: sticky; top: 0; background: rgba(0,0,0,0.95);
+  transition: color 0.15s;
+}
+#agentTable thead th:hover { color: var(--cyan); }
+#agentTable thead th.dir-sorted { color: var(--cyan); }
+#agentTable tbody tr {
+  border-bottom: 1px solid rgba(0,200,255,0.05);
+  cursor: pointer; transition: background 0.12s;
+}
+#agentTable tbody tr:hover { background: rgba(0,200,255,0.07); }
+#agentTable tbody td { padding: 9px 16px; color: var(--white-30); letter-spacing: 0.5px; }
+.agent-name { color: var(--white); font-size: 11px; letter-spacing: 1px; }
+.agent-role { color: rgba(0,200,255,0.62); font-size: 9px; letter-spacing: 0.5px; }
+.agent-city { color: rgba(255,255,255,0.55); font-size: 10px; }
+.agent-node { color: rgba(0,200,255,0.45); font-size: 9px; }
 
 /* ── REQUEST ACCESS PANEL ── */
 #accessPanel {
@@ -655,6 +697,19 @@ canvas {
   animation: blink 2.4s ease-in-out infinite;
 }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+/* ── IPAD / MID-SIZE HEADER ── */
+@media (min-width: 541px) and (max-width: 1024px) {
+  #header { padding: 0 20px; }
+  .h-data  { gap: 14px; }
+  .h-actions { gap: 12px; }
+  .h-val  { font-size: 12px; }
+  .h-lbl  { font-size: 6.5px; }
+  #logo .l1 { font-size: 13px; letter-spacing: 2.5px; }
+  #logo .l2 { font-size: 11px; letter-spacing: 1.5px; }
+  .dir-nav-btn  { font-size: 7.5px; padding: 5px 11px; letter-spacing: 1.8px; }
+  .h-access-btn { font-size: 7.5px; padding: 5px 12px; letter-spacing: 1.8px; }
+}
 
 /* ── STARK SCAN HUD ── */
 #scanHUD {
@@ -1510,6 +1565,102 @@ body.pin-hover { cursor: crosshair; }
   text-transform: uppercase;
   margin-top: 4px;
 }
+
+/* ── AGENT HOVER CARD ── */
+#agentHoverCard {
+  position: fixed;
+  pointer-events: none;
+  z-index: 30;
+  opacity: 0;
+  transition: opacity 0.18s;
+  transform: translate(-50%, calc(-100% - 18px));
+  background: rgba(0,0,0,0.82);
+  border: 1px solid rgba(255,140,0,0.45);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 9px 13px 8px;
+  min-width: 130px;
+  text-align: left;
+}
+#agentHoverCard.vis { opacity: 1; }
+.ahc-city {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 6px; letter-spacing: 2.5px;
+  color: rgba(255,140,0,0.55);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.ahc-agent {
+  display: flex; align-items: baseline; gap: 7px;
+  margin-bottom: 4px;
+}
+.ahc-name {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; letter-spacing: 1px;
+  color: rgba(255,160,0,0.95);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.ahc-role {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 6.5px; letter-spacing: 0.8px;
+  color: rgba(255,255,255,0.38);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ── SECTOR FLASH ── */
+#sectorFlash {
+  position: fixed;
+  top: 62px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; letter-spacing: 4.5px;
+  color: var(--cyan);
+  text-transform: uppercase;
+  pointer-events: none; white-space: nowrap;
+  text-shadow: 0 0 20px rgba(0,200,255,0.55);
+  opacity: 0; transition: opacity 0.45s;
+}
+#sectorFlash.vis { opacity: 1; }
+
+/* Agent mode toggle — fixed above scan HUD */
+#agentToggleBtn {
+  position: fixed;
+  right: 18px;
+  bottom: 300px;
+  z-index: 20;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 7px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  background: rgba(0,0,0,0.72);
+  border: 1px solid rgba(255,130,0,0.32);
+  color: rgba(255,140,0,0.52);
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: border-color 0.15s, color 0.15s, background 0.15s, box-shadow 0.15s;
+  opacity: 0;
+  animation: hudFadeIn 0.8s 4.2s ease forwards;
+}
+#agentToggleBtn:hover {
+  border-color: rgba(255,150,0,0.70);
+  color: rgba(255,165,0,0.90);
+  background: rgba(255,80,0,0.06);
+}
+#agentToggleBtn.active {
+  background: rgba(255,90,0,0.12);
+  border-color: rgba(255,145,0,0.82);
+  color: rgba(255,165,0,1);
+  box-shadow: 0 0 14px rgba(255,100,0,0.22);
+}
+@media (max-width: 540px) {
+  #agentToggleBtn { right: 10px; bottom: 260px; font-size: 6.5px; padding: 5px 10px; }
+}
 </style>
 </head>
 <body>
@@ -1598,6 +1749,8 @@ body.pin-hover { cursor: crosshair; }
 </div>
 
 <!-- Scan HUD — bottom-right readout -->
+<button id="agentToggleBtn" onclick="toggleAgentMode()">⬡ AGENTS VIEW</button>
+
 <div id="scanHUD">
   <div class="shud-header">// NET STATUS</div>
   <div class="shud-row">
@@ -1659,6 +1812,9 @@ body.pin-hover { cursor: crosshair; }
 </div>
 
 <!-- Footer -->
+<div id="agentHoverCard"></div>
+<div id="sectorFlash"></div>
+
 <div id="footer">
   <span class="f-text">© 2026 Lab 100 Inc.</span>
   <span class="f-text" id="fCoords">Drag to Explore · Scroll to Zoom</span>
@@ -1719,10 +1875,14 @@ body.pin-hover { cursor: crosshair; }
   <div class="dir-inner">
     <div class="dir-hdr">
       <div class="dir-title">Network Directory<span id="dirCountLabel">// 100 Nodes</span></div>
+      <div class="dir-tabs">
+        <button class="dir-tab active" id="tabCities" onclick="switchDirTab('cities')">CITIES</button>
+        <button class="dir-tab" id="tabAgents" onclick="switchDirTab('agents')">AGENTS</button>
+      </div>
       <input class="dir-search" id="dirSearch" type="text" placeholder="Search cities, countries..." autocomplete="off" spellcheck="false">
       <button class="dir-close-btn" onclick="closeDirectory()">✕ CLOSE</button>
     </div>
-    <div class="dir-table-wrap">
+    <div class="dir-table-wrap" id="dirCitiesView">
       <table id="dirTable">
         <thead>
           <tr>
@@ -1735,6 +1895,19 @@ body.pin-hover { cursor: crosshair; }
           </tr>
         </thead>
         <tbody id="dirBody"></tbody>
+      </table>
+    </div>
+    <div class="dir-table-wrap" id="dirAgentsView" style="display:none">
+      <table id="agentTable">
+        <thead>
+          <tr>
+            <th data-acol="name">AGENT</th>
+            <th data-acol="role">ROLE</th>
+            <th data-acol="city">CITY</th>
+            <th data-acol="node">NODE</th>
+          </tr>
+        </thead>
+        <tbody id="agentBody"></tbody>
       </table>
     </div>
     <div class="dir-footer">
@@ -3036,9 +3209,53 @@ let   _activeSector = null;
 const _pinTgtScale  = new Float32Array(CITIES.length).fill(1.0);
 const _pinTgtAlpha  = new Float32Array(CITIES.length).fill(1.0);  // 1=full, 0=dim
 
+// ── Global scramble (used for sector flash) ──
+const _GSCR = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/#><@!';
+function gScramble(el, finalText, dur) {
+  const chars = finalText.split('');
+  const total = chars.length;
+  let start = null;
+  function frame(ts) {
+    if (!start) start = ts;
+    const p = Math.min(1, (ts - start) / dur);
+    const resolved = Math.floor(p * total);
+    el.textContent = chars.map((c, i) => {
+      if (i < resolved) return c;
+      if (c === ' ' || c === '/') return c;
+      return _GSCR[Math.floor(Math.random() * _GSCR.length)];
+    }).join('');
+    if (p < 1) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+// ── Sector flash ──
+let _flashDimTimer = null;
+function showSectorFlash(sectorId) {
+  const el = document.getElementById('sectorFlash');
+  if (!el) return;
+  clearTimeout(_flashDimTimer);
+  if (!sectorId) { el.classList.remove('vis'); return; }
+  const sec   = SECTORS.find(s => s.id === sectorId);
+  const label = sec ? sec.label.toUpperCase() : sectorId.toUpperCase();
+  const count = CITIES.filter(c => c._sectors.has(sectorId)).length;
+  const text  = `// ${count} ${label} NODES ACTIVE //`;
+  el.classList.add('vis');
+  el.style.opacity = '';
+  el.style.fontSize = '';
+  el.style.letterSpacing = '';
+  gScramble(el, text, 450);
+  // Settle to a dim persistent readout after 4s
+  _flashDimTimer = setTimeout(() => {
+    el.style.opacity = '0.30';
+    el.style.fontSize = '7px';
+    el.style.letterSpacing = '3px';
+  }, 4000);
+}
+
 function setSectorFilter(sectorId) {
   _activeSector = sectorId;
-  document.querySelectorAll('.sec-btn').forEach(btn => {
+  document.querySelectorAll('.sec-btn:not(.agent-btn)').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.sector === (sectorId || ''));
   });
   CITIES.forEach((city, i) => {
@@ -3046,8 +3263,61 @@ function setSectorFilter(sectorId) {
     _pinTgtScale[i] = match ? 1.45 : 0.20;
     _pinTgtAlpha[i] = match ? 1.0  : 0.0;
   });
+  showSectorFlash(sectorId);
   // Sync directory if open
   syncDirToSector();
+}
+
+// ── Agent Mode ──
+let _agentMode = false;
+const _aModeVec = new THREE.Vector3();
+let   _ahcIdx   = -1; // which city the hover card is currently showing
+
+function toggleAgentMode() {
+  _agentMode = !_agentMode;
+  const btn = document.getElementById('agentToggleBtn');
+  if (btn) btn.classList.toggle('active', _agentMode);
+  if (_agentMode) {
+    pinMeshes.forEach((pin, i) => {
+      if (i !== selIdx) {
+        pin.material.color.setHex(0xff8c00);
+        pin.material.emissive.setHex(0xff4400);
+      }
+    });
+  } else {
+    document.getElementById('agentHoverCard').classList.remove('vis');
+    _ahcIdx = -1;
+    pinMeshes.forEach(pin => {
+      pin.material.color.setHex(0xffffff);
+      pin.material.emissive.setHex(0x00c8ff);
+    });
+  }
+}
+window.toggleAgentMode = toggleAgentMode;
+
+function updateAgentHoverCard() {
+  const card = document.getElementById('agentHoverCard');
+  const idx  = hoverIdx >= 0 ? hoverIdx : (selIdx >= 0 ? -1 : -1);
+  if (!_agentMode || idx < 0) {
+    card.classList.remove('vis');
+    _ahcIdx = -1;
+    return;
+  }
+  // Position at pin screen coords
+  hitMeshes[idx].getWorldPosition(_aModeVec);
+  const v = _aModeVec.clone().project(camera);
+  const x = (v.x + 1) / 2 * window.innerWidth;
+  const y = (-v.y + 1) / 2 * window.innerHeight;
+  card.style.left = x + 'px';
+  card.style.top  = y + 'px';
+  // Rebuild content only when city changes
+  if (_ahcIdx !== idx) {
+    _ahcIdx = idx;
+    const city = CITIES[idx];
+    card.innerHTML = `<div class="ahc-city">${city.name} // NODE-${String(idx+1).padStart(3,'0')}</div>`
+      + city.agents.map(a => `<div class="ahc-agent"><span class="ahc-name">${a.n}</span><span class="ahc-role">${a.r}</span></div>`).join('');
+  }
+  card.classList.add('vis');
 }
 
 function syncDirToSector() {
@@ -4174,7 +4444,10 @@ function openPanel(idx) {
   }
 
   pinMeshes.forEach((p, i) => {
-    p.material.color.setHex(i === idx ? 0x00c8ff : 0xffffff);
+    const baseColor = _agentMode && i !== idx ? 0xff8c00 : 0xffffff;
+    p.material.color.setHex(i === idx ? 0x00c8ff : baseColor);
+    if (_agentMode && i !== idx) p.material.emissive.setHex(0xff4400);
+    else if (i !== idx)         p.material.emissive.setHex(0x00c8ff);
     p.material.emissiveIntensity = i === idx ? 2.5 : 0.85;
   });
 }
@@ -4189,7 +4462,16 @@ function closePanel() {
   _viewOffTarget = 0;
   selIdx = -1;
   clearCountryHighlight();
-  pinMeshes.forEach((p, i) => { p.material.color.setHex(0xffffff); p.material.emissiveIntensity = _pinTgtAlpha[i] > 0.5 ? 0.85 : 0.06; });
+  pinMeshes.forEach((p, i) => {
+    if (_agentMode) {
+      p.material.color.setHex(0xff8c00);
+      p.material.emissive.setHex(0xff4400);
+    } else {
+      p.material.color.setHex(0xffffff);
+      p.material.emissive.setHex(0x00c8ff);
+    }
+    p.material.emissiveIntensity = _pinTgtAlpha[i] > 0.5 ? 0.85 : 0.06;
+  });
   refreshArcs(-1);
 }
 window.closePanel = closePanel;
@@ -4197,12 +4479,68 @@ window.closePanel = closePanel;
 // ═══════════════════════════════════════════════════
 //  DIRECTORY
 // ═══════════════════════════════════════════════════
+let _dirTab = 'cities';
+let agentSortCol = 'name'; let agentSortAsc = true;
+
+function switchDirTab(tab) {
+  _dirTab = tab;
+  document.getElementById('tabCities').classList.toggle('active', tab === 'cities');
+  document.getElementById('tabAgents').classList.toggle('active', tab === 'agents');
+  document.getElementById('dirCitiesView').style.display = tab === 'cities' ? '' : 'none';
+  document.getElementById('dirAgentsView').style.display = tab === 'agents'  ? '' : 'none';
+  const search = document.getElementById('dirSearch');
+  search.placeholder = tab === 'cities' ? 'Search cities, countries...' : 'Search agents, roles...';
+  search.value = '';
+  if (tab === 'cities') renderDirTable('');
+  else renderAgentTable('');
+}
+
+function renderAgentTable(filter) {
+  const q = (filter || '').toLowerCase().trim();
+  // Flatten all agents across cities
+  let rows = [];
+  CITIES.forEach((c, idx) => {
+    c.agents.forEach(a => {
+      rows.push({ name: a.n, role: a.r, city: c.name, country: c.country, cityIdx: idx });
+    });
+  });
+  if (q) {
+    rows = rows.filter(r =>
+      r.name.toLowerCase().includes(q) ||
+      r.role.toLowerCase().includes(q) ||
+      r.city.toLowerCase().includes(q) ||
+      r.country.toLowerCase().includes(q)
+    );
+  }
+  rows.sort((a, b) => {
+    const va = a[agentSortCol] || '', vb = b[agentSortCol] || '';
+    if (typeof va === 'string') return agentSortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return agentSortAsc ? va - vb : vb - va;
+  });
+  document.getElementById('agentBody').innerHTML = rows.map(r => `
+    <tr onclick="selectFromDirectory(${r.cityIdx})">
+      <td class="agent-name">${r.name}</td>
+      <td class="agent-role">${r.role}</td>
+      <td class="agent-city">${r.city}</td>
+      <td class="agent-node">NODE-${String(r.cityIdx+1).padStart(3,'0')}</td>
+    </tr>`).join('');
+  const total = CITIES.reduce((s, c) => s + c.agents.length, 0);
+  document.getElementById('dirFooterCount').textContent = rows.length === total ? `${total} agents active` : `${rows.length} / ${total} agents`;
+  document.getElementById('dirCountLabel').textContent = `// ${rows.length} AGENTS`;
+}
+
 function openDirectory() {
+  _dirTab = 'cities';
   dirSortCol = 'id'; dirSortAsc = true;
+  agentSortCol = 'name'; agentSortAsc = true;
   document.getElementById('dirSearch').value = '';
+  document.getElementById('dirSearch').placeholder = 'Search cities, countries...';
+  document.getElementById('dirCitiesView').style.display = '';
+  document.getElementById('dirAgentsView').style.display = 'none';
+  document.getElementById('tabCities').classList.add('active');
+  document.getElementById('tabAgents').classList.remove('active');
   renderDirTable('');
   document.getElementById('directoryPanel').classList.add('open');
-  // Update sort header indicators
   document.querySelectorAll('#dirTable thead th').forEach(th => th.classList.remove('dir-sorted'));
   document.querySelector('#dirTable thead th[data-col="id"]').classList.add('dir-sorted');
 }
@@ -4270,9 +4608,21 @@ document.querySelectorAll('#dirTable thead th').forEach(th => {
     renderDirTable(document.getElementById('dirSearch').value);
   });
 });
-// Live search
+// Live search — routes to whichever tab is active
 document.getElementById('dirSearch').addEventListener('input', e => {
-  renderDirTable(e.target.value);
+  if (_dirTab === 'cities') renderDirTable(e.target.value);
+  else renderAgentTable(e.target.value);
+});
+// Agent table column sort
+document.querySelectorAll('#agentTable thead th').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.acol;
+    if (agentSortCol === col) agentSortAsc = !agentSortAsc;
+    else { agentSortCol = col; agentSortAsc = true; }
+    document.querySelectorAll('#agentTable thead th').forEach(h => h.classList.remove('dir-sorted'));
+    th.classList.add('dir-sorted');
+    renderAgentTable(document.getElementById('dirSearch').value);
+  });
 });
 // Close on backdrop click
 document.getElementById('directoryPanel').addEventListener('click', e => {
@@ -4285,6 +4635,7 @@ document.addEventListener('keydown', e => {
 window.openDirectory  = openDirectory;
 window.closeDirectory = closeDirectory;
 window.selectFromDirectory = selectFromDirectory;
+window.switchDirTab = switchDirTab;
 
 // ── Access Panel ──
 function openAccessPanel()  { document.getElementById('accessPanel').classList.add('open'); }
@@ -4733,6 +5084,7 @@ const clock = new THREE.Clock();
     _viewOffTarget === 0 ? camera.clearViewOffset() : camera.setViewOffset(window.innerWidth, window.innerHeight, _viewOffX, 0, window.innerWidth, window.innerHeight);
   }
 
+  updateAgentHoverCard();
   renderer.render(scene, camera);
 })();
 </script>

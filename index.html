@@ -345,7 +345,7 @@ canvas {
   font-family: 'IBM Plex Mono', monospace; font-size: 8px;
   color: var(--cyan); opacity: 0.55; letter-spacing: 1px; flex-shrink: 0;
 }
-@media (max-width: 640px) {
+@media (max-width: 1024px) {
   .access-body { flex-direction: column; overflow-y: auto; }
   .access-info { border-right: none; border-bottom: 1px solid var(--border); }
   .access-cta-col { justify-content: flex-start; }
@@ -698,18 +698,7 @@ canvas {
 }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.35} }
 
-/* ── IPAD / MID-SIZE HEADER ── */
-@media (min-width: 541px) and (max-width: 1024px) {
-  #header { padding: 0 20px; }
-  .h-data  { gap: 14px; }
-  .h-actions { gap: 12px; }
-  .h-val  { font-size: 12px; }
-  .h-lbl  { font-size: 6.5px; }
-  #logo .l1 { font-size: 13px; letter-spacing: 2.5px; }
-  #logo .l2 { font-size: 11px; letter-spacing: 1.5px; }
-  .dir-nav-btn  { font-size: 7.5px; padding: 5px 11px; letter-spacing: 1.8px; }
-  .h-access-btn { font-size: 7.5px; padding: 5px 12px; letter-spacing: 1.8px; }
-}
+/* iPad now inherits mobile layout — no mid-size override */
 
 /* ── STARK SCAN HUD ── */
 #scanHUD {
@@ -820,7 +809,7 @@ canvas {
   100% { color: var(--cyan); text-shadow: 0 0 14px rgba(0,200,255,0.6); }
 }
 
-@media (max-width: 540px) {
+@media (max-width: 1024px) {
   #scanHUD {
     display: block;
     bottom: 100px;
@@ -837,7 +826,7 @@ canvas {
 }
 
 /* ── MOBILE HEADER — two-row layout ── */
-@media (max-width: 540px) {
+@media (max-width: 1024px) {
   /* Header becomes a wrapping flex container */
   #header {
     flex-wrap: wrap;
@@ -955,7 +944,7 @@ canvas {
   text-align: center;
   line-height: 1.2;
 }
-@media (max-width: 640px) {
+@media (max-width: 1024px) {
   #orientHUD {
     left: 10px;
     top: auto;
@@ -1370,7 +1359,7 @@ body.pin-hover { cursor: crosshair; }
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
 }
-@media (max-width: 640px) {
+@media (max-width: 1024px) {
   /* Ticker + HUD corners hidden on mobile */
   #ticker { display: none; }
   .hud-corner { display: none; }
@@ -1523,7 +1512,7 @@ body.pin-hover { cursor: crosshair; }
   opacity: 0.45;
   font-size: 6.5px;
 }
-@media (max-width: 540px) {
+@media (max-width: 1024px) {
   #sectorBar { bottom: 44px; }
   .sec-btn { font-size: 6.5px; padding: 4px 9px; letter-spacing: 1.4px; }
 }
@@ -1658,7 +1647,7 @@ body.pin-hover { cursor: crosshair; }
   color: rgba(255,165,0,1);
   box-shadow: 0 0 14px rgba(255,100,0,0.22);
 }
-@media (max-width: 540px) {
+@media (max-width: 1024px) {
   #agentToggleBtn { right: 10px; bottom: 260px; font-size: 6.5px; padding: 5px 10px; }
 }
 </style>
@@ -2657,7 +2646,7 @@ renderer.setClearColor(0x000000, 1);
 
 const scene  = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.z = window.innerWidth < 640 ? 29 : 19;
+camera.position.z = window.innerWidth < 1024 ? 29 : 19;
 
 // Lighting — soft, even, no harsh specular ball
 scene.add(new THREE.AmbientLight(0x0d2040, 8.0));
@@ -4269,7 +4258,36 @@ canvas.addEventListener('touchend', e => {
     mouse.y = (ty / window.innerHeight) * -2 + 1;
     raycaster.setFromCamera(mouse, camera);
     const hits = raycaster.intersectObjects(hitMeshes);
-    if (hits.length) openPanel(hits[0].object.userData.cityIdx);
+    if (hits.length) {
+      const ci = hits[0].object.userData.cityIdx;
+      if (_agentMode) {
+        // In agent mode: first tap shows agent card, second tap on same city opens panel
+        const card = document.getElementById('agentHoverCard');
+        if (_ahcIdx === ci && card.classList.contains('vis')) {
+          openPanel(ci);
+        } else {
+          // Position card at tap point
+          hitMeshes[ci].getWorldPosition(_aModeVec);
+          const v = _aModeVec.clone().project(camera);
+          const x = (v.x + 1) / 2 * window.innerWidth;
+          const y = (-v.y + 1) / 2 * window.innerHeight;
+          card.style.left = x + 'px';
+          card.style.top  = y + 'px';
+          const city = CITIES[ci];
+          card.innerHTML = `<div class="ahc-city">${city.name} // NODE-${String(ci+1).padStart(3,'0')}</div>`
+            + city.agents.map(a => `<div class="ahc-agent"><span class="ahc-name">${a.n}</span><span class="ahc-role">${a.r}</span></div>`).join('')
+            + `<div style="margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:6.5px;letter-spacing:2px;color:rgba(255,140,0,0.55);text-align:center;">TAP AGAIN TO OPEN CITY</div>`;
+          _ahcIdx = ci;
+          card.classList.add('vis');
+        }
+      } else {
+        openPanel(ci);
+      }
+    } else if (_agentMode) {
+      // Tap on empty space dismisses card
+      document.getElementById('agentHoverCard').classList.remove('vis');
+      _ahcIdx = -1;
+    }
   }
   tTapStart = null;
 });
@@ -4420,7 +4438,7 @@ function openPanel(idx) {
   panel.classList.add('open');
 
   // Shift globe left on desktop so panel doesn't cover it
-  if (window.innerWidth >= 640) _viewOffTarget = 200;
+  if (window.innerWidth >= 1024) _viewOffTarget = 200;
 
   // JARVIS reveal — sweep then content fade-in
   const _reveal  = panel.querySelector('.p-reveal');
@@ -4804,9 +4822,9 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   // Enforce mobile zoom — e.g. when rotating phone
-  if (window.innerWidth < 640 && camera.position.z < 27) camera.position.z = 29;
+  if (window.innerWidth < 1024 && camera.position.z < 27) camera.position.z = 29;
   // Enforce desktop zoom when expanding back
-  if (window.innerWidth >= 640 && camera.position.z > 22) camera.position.z = 19;
+  if (window.innerWidth >= 1024 && camera.position.z > 22) camera.position.z = 19;
   // If panel is open but we resized to mobile, drop the horizontal offset
   if (window.innerWidth < 640) { _viewOffX = 0; _viewOffTarget = 0; camera.clearViewOffset(); }
 });

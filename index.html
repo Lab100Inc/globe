@@ -48,7 +48,6 @@ canvas {
   pointer-events: none;
   z-index: 2;
   top: 50%;
-  /* left + transform driven by JS so rings follow the globe */
 }
 #ringH {
   /* Horizontal / equatorial ring */
@@ -1781,7 +1780,7 @@ const CITIES = [
   { name:"Vancouver", country:"Canada", lat:49.28, lon:-123.12,
     industries:["Technology","Real Estate","Mining","Film","Sustainability"],
     overview:"Canada's Pacific gateway with deep Asia-Pacific ties. A booming clean energy sector and significant magnet for Asian capital and skilled immigration.",
-    agents:[{n:"T. LEE",r:"Pacific & Mining Connector"}] },
+    agents:[{n:"N. COUCH",r:"Vancouver Representative"}] },
 
   { name:"Casablanca", country:"Morocco", lat:33.57, lon:-7.59,
     industries:["Finance","Trade","Real Estate","Tourism","Phosphates"],
@@ -2011,7 +2010,7 @@ const CITIES = [
   { name:"Winnipeg", country:"Canada", lat:49.90, lon:-97.14,
     industries:["Agriculture","Transportation","Manufacturing","Finance","Clean Energy"],
     overview:"The Prairie gateway at the geographic heart of North America. Winnipeg anchors Canada's grain trade, controls critical east-west rail logistics, and is an emerging hub for clean energy and advanced manufacturing.",
-    agents:[{n:"L. MACKENZIE",r:"Prairie Region Connector"},{n:"J. CARDINAL",r:"Agriculture & Logistics Broker"}] },
+    agents:[{n:"M. CHING",r:"Winnipeg Representative"}] },
 ];
 
 // ── Accurate UTC offsets per city (decimal = half-hour zone, e.g. 5.5 = UTC+5:30) ──
@@ -2490,23 +2489,199 @@ function clearCountryHighlight() {
 }
 
 // ═══════════════════════════════════════════════════
-//  SCAN SWEEP LINE — vertical ring rotating around globe
+//  SCAN SWEEP — JARVIS multi-layer radar scanner
 // ═══════════════════════════════════════════════════
-const _scanPts = [];
-for (let i = 0; i <= 100; i++) {
-  const phi = (i / 100) * Math.PI * 2;
-  _scanPts.push(new THREE.Vector3(0, (GLOBE_R+0.07)*Math.cos(phi), (GLOBE_R+0.07)*Math.sin(phi)));
+const SWEEP_R1 = GLOBE_R + 0.05;  // primary sweep arc (hugs globe)
+const SWEEP_R2 = GLOBE_R + 0.40;  // outer halo arc
+const SWEEP_R3 = GLOBE_R + 0.70;  // far glow arc
+
+// Static orbit guides — faint rings showing sweep paths
+(function() {
+  [[SWEEP_R1, 0.12], [SWEEP_R2, 0.06], [SWEEP_R3, 0.03]].forEach(([r, op]) => {
+    const pts = [];
+    for (let i = 0; i <= 128; i++) {
+      const phi = (i / 128) * Math.PI * 2;
+      pts.push(new THREE.Vector3(0, r * Math.cos(phi), r * Math.sin(phi)));
+    }
+    scene.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: op })
+    ));
+  });
+})();
+
+// Primary sweep group
+const scanGroup  = new THREE.Group();
+scene.add(scanGroup);
+
+// Counter-rotating JARVIS ring — different orbital plane
+const scanGroup2 = new THREE.Group();
+scene.add(scanGroup2);
+
+const _TRAIL_SEGS = 28;
+const _TRAIL_ARC  = Math.PI * 1.10; // ~198° — nearly half the globe
+const scanTrailMats  = [];
+const scanHaloMats   = [];
+const scanFarMats    = [];
+
+// Primary inner arc
+for (let s = 0; s < _TRAIL_SEGS; s++) {
+  const a0 = (s     / _TRAIL_SEGS) * _TRAIL_ARC;
+  const a1 = ((s+1) / _TRAIL_SEGS) * _TRAIL_ARC;
+  const pts = [];
+  for (let i = 0; i <= 12; i++) {
+    const phi = a0 + (a1 - a0) * (i / 12);
+    pts.push(new THREE.Vector3(0, SWEEP_R1 * Math.cos(phi), SWEEP_R1 * Math.sin(phi)));
+  }
+  const frac = 1 - s / _TRAIL_SEGS;
+  const mat  = new THREE.LineBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: Math.pow(frac, 0.75) * 0.99 });
+  scanTrailMats.push(mat);
+  scanGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
 }
-const scanLine = new THREE.Line(
-  new THREE.BufferGeometry().setFromPoints(_scanPts),
-  new THREE.LineBasicMaterial({ color:0x00c8ff, transparent:true, opacity:0.18 })
+
+// Outer halo arc
+for (let s = 0; s < _TRAIL_SEGS; s++) {
+  const a0 = (s     / _TRAIL_SEGS) * _TRAIL_ARC;
+  const a1 = ((s+1) / _TRAIL_SEGS) * _TRAIL_ARC;
+  const pts = [];
+  for (let i = 0; i <= 12; i++) {
+    const phi = a0 + (a1 - a0) * (i / 12);
+    pts.push(new THREE.Vector3(0, SWEEP_R2 * Math.cos(phi), SWEEP_R2 * Math.sin(phi)));
+  }
+  const frac = 1 - s / _TRAIL_SEGS;
+  const mat = new THREE.LineBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: Math.pow(frac, 0.85) * 0.50 });
+  scanHaloMats.push(mat);
+  scanGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
+}
+
+// Far glow arc — ~60% of arc length, very faint
+for (let s = 0; s < _TRAIL_SEGS; s++) {
+  const a0 = (s     / _TRAIL_SEGS) * _TRAIL_ARC * 0.6;
+  const a1 = ((s+1) / _TRAIL_SEGS) * _TRAIL_ARC * 0.6;
+  const pts = [];
+  for (let i = 0; i <= 8; i++) {
+    const phi = a0 + (a1 - a0) * (i / 8);
+    pts.push(new THREE.Vector3(0, SWEEP_R3 * Math.cos(phi), SWEEP_R3 * Math.sin(phi)));
+  }
+  const frac = 1 - s / _TRAIL_SEGS;
+  const mat = new THREE.LineBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: Math.pow(frac, 1.2) * 0.20 });
+  scanFarMats.push(mat);
+  scanGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
+}
+
+// Scanner fan wedge — radial lines fanning from globe surface → outer arc at the leading tip
+const _FAN_N      = 8;
+const _FAN_SPREAD = Math.PI * 0.12; // ~21° total fan width
+const fanMats = [];
+for (let f = 0; f < _FAN_N; f++) {
+  const angle = (f / (_FAN_N - 1) - 0.5) * _FAN_SPREAD;
+  const cosA = Math.cos(angle), sinA = Math.sin(angle);
+  const yIn = (GLOBE_R + 0.04) * cosA, zIn = (GLOBE_R + 0.04) * sinA;
+  const yOut = SWEEP_R2 * cosA,        zOut = SWEEP_R2 * sinA;
+  const frac = 1 - Math.abs(f / (_FAN_N - 1) - 0.5) * 2; // peak at center
+  const mat  = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: Math.pow(frac, 0.6) * 0.60 });
+  fanMats.push(mat);
+  scanGroup.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, yIn, zIn),
+      new THREE.Vector3(0, yOut, zOut)
+    ]),
+    mat
+  ));
+}
+
+// Leading tip — white flash at inner arc
+const _sweepTip = new THREE.Mesh(
+  new THREE.SphereGeometry(0.10, 8, 8),
+  new THREE.MeshBasicMaterial({ color: 0xffffff })
 );
-scene.add(scanLine); // NOT in G — sweeps independently of globe rotation
-const scanHalo = new THREE.Line(
-  new THREE.BufferGeometry().setFromPoints(_scanPts.map(p => p.clone().multiplyScalar((GLOBE_R+0.22)/(GLOBE_R+0.07)))),
-  new THREE.LineBasicMaterial({ color:0x00c8ff, transparent:true, opacity:0.07 })
+_sweepTip.position.set(0, SWEEP_R1, 0);
+scanGroup.add(_sweepTip);
+
+// Inner tip glow
+const _sweepTipHalo = new THREE.Mesh(
+  new THREE.SphereGeometry(0.30, 8, 8),
+  new THREE.MeshBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: 0.42 })
 );
-scene.add(scanHalo);
+_sweepTipHalo.position.set(0, SWEEP_R1, 0);
+scanGroup.add(_sweepTipHalo);
+
+// Outer arc tip flash
+const _sweepTipHalo2 = new THREE.Mesh(
+  new THREE.SphereGeometry(0.20, 8, 8),
+  new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.32 })
+);
+_sweepTipHalo2.position.set(0, SWEEP_R2, 0);
+scanGroup.add(_sweepTipHalo2);
+
+// Far arc tip — ghost dot
+const _sweepTipHalo3 = new THREE.Mesh(
+  new THREE.SphereGeometry(0.12, 8, 8),
+  new THREE.MeshBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: 0.18 })
+);
+_sweepTipHalo3.position.set(0, SWEEP_R3, 0);
+scanGroup.add(_sweepTipHalo3);
+
+// Scanner beam — vertical column from outer arc down to globe surface
+const _beamMat = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.85 });
+const _beamLine = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, SWEEP_R2, 0),
+    new THREE.Vector3(0, GLOBE_R + 0.04, 0)
+  ]),
+  _beamMat
+);
+scanGroup.add(_beamLine);
+
+// Beam impact dot
+const _beamImpact = new THREE.Mesh(
+  new THREE.SphereGeometry(0.07, 8, 8),
+  new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.95 })
+);
+_beamImpact.position.set(0, GLOBE_R + 0.04, 0);
+scanGroup.add(_beamImpact);
+
+// Impact ripple ring — expands outward from beam hit point
+const _impactRingPts = [];
+for (let i = 0; i <= 40; i++) {
+  const a = (i / 40) * Math.PI * 2;
+  _impactRingPts.push(new THREE.Vector3(Math.cos(a) * 0.22, GLOBE_R + 0.04, Math.sin(a) * 0.22));
+}
+const _impactRingMat = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.60 });
+const _impactRing = new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints(_impactRingPts),
+  _impactRingMat
+);
+scanGroup.add(_impactRing);
+
+// Counter-rotating arc — sweeps opposite direction in perpendicular orbital plane (JARVIS multi-ring)
+(function() {
+  const _CR_SEGS = 18;
+  const _CR_ARC  = Math.PI * 0.65;
+  const R = GLOBE_R + 0.48;
+  for (let s = 0; s < _CR_SEGS; s++) {
+    const a0 = (s / _CR_SEGS) * _CR_ARC;
+    const a1 = ((s+1) / _CR_SEGS) * _CR_ARC;
+    const pts = [];
+    for (let i = 0; i <= 8; i++) {
+      const phi = a0 + (a1 - a0) * (i / 8);
+      pts.push(new THREE.Vector3(R * Math.cos(phi), 0, R * Math.sin(phi)));
+    }
+    const frac = 1 - s / _CR_SEGS;
+    scanGroup2.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: Math.pow(frac, 1.3) * 0.28 })
+    ));
+  }
+  // Counter-ring tip dot
+  const crTip = new THREE.Mesh(
+    new THREE.SphereGeometry(0.07, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.45 })
+  );
+  crTip.position.set(R, 0, 0);
+  scanGroup2.add(crTip);
+})();
+
 
 // ── City pins ──
 const pinMeshes = [];
@@ -2946,7 +3121,7 @@ function startLocalClock(city) {
     if (h >= 7  && h < 9)  return { label: 'COMING ONLINE', status: 'standby' };
     if (h >= 18 && h < 21) return { label: 'SIGNING OFF',   status: 'standby' };
     if (h >= 6  && h < 7)  return { label: 'STANDBY',       status: 'standby' };
-    return                         { label: 'OFF GRID',      status: 'offline' };
+    return                         { label: 'OFFLINE',       status: 'offline' };
   }
 
   let firstTick = true;
@@ -3437,18 +3612,17 @@ const clock = new THREE.Clock();
   atmoMid.material.opacity   = 0.115 + 0.030 * Math.sin(t * 0.31 + 2.3); // mid corona
 
   // Nav rings — gimbal system tracking globe orientation, follows view offset
-  const _fovR = camera.fov * Math.PI / 180;
+  // CSS gimbal rings — original positioning
+  const _fovR  = camera.fov * Math.PI / 180;
   const _projR = (GLOBE_R / camera.position.z) * (window.innerHeight / (2 * Math.tan(_fovR / 2)));
-  const _rCX  = (window.innerWidth / 2 - _viewOffX) + 'px';
-  const _dH   = _projR * 2 * 1.08;  // horizontal ring — hugs equator
-  const _dV   = _projR * 2 * 1.13;  // vertical ring — slightly outside
-  // Horizontal ring: lies flat (rotateX(78deg)), node angle = yaw
+  const _rCX   = (window.innerWidth / 2 - _viewOffX) + 'px';
+  const _dH    = _projR * 2 * 1.08;
+  const _dV    = _projR * 2 * 1.13;
   ringH.style.left      = _rCX;
   ringH.style.width     = _dH + 'px';
   ringH.style.height    = _dH + 'px';
   ringH.style.transform = `translate(-50%,-50%) perspective(900px) rotateX(78deg)`;
   ringHArm.style.transform = `rotate(${G.rotation.y.toFixed(4)}rad)`;
-  // Vertical ring: stands upright (slight rotateY for depth), node angle = pitch
   ringV.style.left      = _rCX;
   ringV.style.width     = _dV + 'px';
   ringV.style.height    = _dV + 'px';
@@ -3472,13 +3646,41 @@ const clock = new THREE.Clock();
   ohudPVal.textContent = (_pd >= 0 ? '+' : '') + _pd.toFixed(0) + '°';
   ohudYVal.textContent = (_yd >= 0 ? '+' : '') + _yd.toFixed(0) + '°';
 
-  // Scan sweep — independent of globe rotation
-  scanLine.rotation.y = t * 0.22;
-  scanHalo.rotation.y = t * 0.22;
-  // Ambient scan — subtle, boosts briefly when a city is selected
-  const scanBase = selIdx >= 0 ? 0.32 : 0.18;
-  scanLine.material.opacity = scanBase + 0.08 * Math.sin(t * 1.8);
-  scanHalo.material.opacity = 0.06 + 0.03 * Math.sin(t * 1.4);
+  // Scan sweep — JARVIS multi-layer scanner
+  const _scanSpeed = selIdx >= 0 ? 0.52 : 0.36;
+  scanGroup.rotation.y  =  t * _scanSpeed;
+  scanGroup2.rotation.x = -t * 0.19; // counter-rotate perpendicular plane
+
+  const _scanBoost  = selIdx >= 0 ? 1.9 : 1.0;
+  const _scanPulse  = 1 + 0.28 * Math.sin(t * 3.8);
+  const _scanFlick  = 1 + 0.18 * Math.sin(t * 9.0); // fast tip flicker
+  const _scanSlowP  = 1 + 0.12 * Math.sin(t * 1.4); // slow breathe on far ring
+
+  scanTrailMats.forEach((mat, s) => {
+    const frac = 1 - s / _TRAIL_SEGS;
+    mat.opacity = Math.pow(frac, 0.75) * 0.99 * _scanBoost * _scanPulse;
+  });
+  scanHaloMats.forEach((mat, s) => {
+    const frac = 1 - s / _TRAIL_SEGS;
+    mat.opacity = Math.pow(frac, 0.85) * 0.50 * _scanBoost * _scanPulse;
+  });
+  scanFarMats.forEach((mat, s) => {
+    const frac = 1 - s / _TRAIL_SEGS;
+    mat.opacity = Math.pow(frac, 1.2) * 0.20 * _scanBoost * _scanSlowP;
+  });
+  fanMats.forEach((mat, f) => {
+    const frac = 1 - Math.abs(f / (_FAN_N - 1) - 0.5) * 2;
+    mat.opacity = Math.pow(frac, 0.6) * 0.60 * _scanBoost * _scanPulse;
+  });
+  _sweepTipHalo.material.opacity  = 0.42 * _scanBoost * _scanFlick;
+  _sweepTipHalo2.material.opacity = 0.32 * _scanBoost * _scanPulse;
+  _sweepTipHalo3.material.opacity = 0.18 * _scanBoost * _scanSlowP;
+  _beamMat.opacity = 0.85 * _scanBoost * _scanPulse;
+  _beamImpact.material.opacity = 0.95 * _scanBoost * _scanFlick;
+  // Impact ripple — continuously expanding ring that resets
+  const _ripPhase = (t * 1.8) % 1;
+  _impactRing.scale.set(1 + _ripPhase * 1.2, 1, 1 + _ripPhase * 1.2);
+  _impactRingMat.opacity = (1 - _ripPhase) * 0.60 * _scanBoost;
 
   // Pulse rings
   ringData.forEach(rd => {

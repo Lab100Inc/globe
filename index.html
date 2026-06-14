@@ -659,7 +659,7 @@ canvas {
 /* ── STARK SCAN HUD ── */
 #scanHUD {
   position: fixed;
-  bottom: 88px;
+  bottom: 56px;
   right: 18px;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 8px;
@@ -765,7 +765,21 @@ canvas {
   100% { color: var(--cyan); text-shadow: 0 0 14px rgba(0,200,255,0.6); }
 }
 
-@media (max-width: 540px) { #scanHUD { display: none; } }
+@media (max-width: 540px) {
+  #scanHUD {
+    display: block;
+    bottom: 100px;
+    right: 10px;
+    font-size: 6.5px;
+    letter-spacing: 1.5px;
+    min-width: 148px;
+    opacity: 0.85;
+  }
+  .shud-header { font-size: 6px; letter-spacing: 2px; }
+  .shud-stat-key { min-width: 36px; }
+  .shud-ops { display: none; }       /* hide ops list on mobile — too cramped */
+  .shud-bar-track { height: 2px; }
+}
 
 /* ── MOBILE HEADER — two-row layout ── */
 @media (max-width: 540px) {
@@ -890,7 +904,7 @@ canvas {
   #orientHUD {
     left: 10px;
     top: auto;
-    bottom: 58px;        /* sit above the ticker bar */
+    bottom: 100px;       /* sit above sector filter bar */
     transform: none;
     gap: 7px;
     opacity: 0.80;
@@ -927,12 +941,11 @@ canvas {
 /* ── HINT ── */
 #hint {
   position: fixed;
-  bottom: 64px; left: 50%;
-  transform: translateX(-50%);
+  top: 72px; left: 22px;
   z-index: 20;
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 8px;
-  letter-spacing: 3px;
+  font-size: 7.5px;
+  letter-spacing: 2.5px;
   color: rgba(0,200,255,0.28);
   text-transform: uppercase;
   pointer-events: none;
@@ -1307,15 +1320,7 @@ body.pin-hover { cursor: crosshair; }
   #ticker { display: none; }
   .hud-corner { display: none; }
 
-  /* Hint — allow wrap, lift above footer */
-  #hint {
-    bottom: 54px;
-    font-size: 7px;
-    letter-spacing: 2px;
-    white-space: normal;
-    text-align: center;
-    width: 72%;
-  }
+  #hint { font-size: 7px; letter-spacing: 2px; }
 
   /* Panel — bottom sheet on mobile, leaves globe visible above */
   #cityPanel {
@@ -1406,6 +1411,67 @@ body.pin-hover { cursor: crosshair; }
 .sct-name   { color: #00c8ff; font-size: 9px; letter-spacing: 2px; }
 .sct-time   { color: rgba(0,200,255,0.58); font-size: 7.5px; }
 .sct-coords { color: rgba(0,200,255,0.32); font-size: 6.5px; }
+
+/* ── Sector Filter Bar ── */
+#sectorBar {
+  position: fixed;
+  bottom: 46px;
+  left: 0; right: 0;
+  z-index: 18;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  padding: 0 12px;
+  opacity: 0;
+  animation: hudFadeIn 0.8s 4s ease forwards;
+}
+#sectorScroll {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  pointer-events: all;
+  padding: 4px 2px 4px;
+  -webkit-overflow-scrolling: touch;
+}
+#sectorScroll::-webkit-scrollbar { display: none; }
+.sec-btn {
+  background: rgba(0,0,0,0.72);
+  border: 1px solid rgba(0,200,255,0.14);
+  color: rgba(0,200,255,0.38);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 7px;
+  letter-spacing: 1.8px;
+  padding: 5px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-transform: uppercase;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  flex-shrink: 0;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  line-height: 1;
+}
+.sec-btn:hover {
+  border-color: rgba(0,200,255,0.4);
+  color: rgba(0,200,255,0.8);
+  background: rgba(0,200,255,0.04);
+}
+.sec-btn.active {
+  background: rgba(0,200,255,0.11);
+  border-color: #00c8ff;
+  color: #00c8ff;
+  box-shadow: 0 0 12px rgba(0,200,255,0.10);
+}
+.sec-count {
+  margin-left: 6px;
+  opacity: 0.45;
+  font-size: 6.5px;
+}
+@media (max-width: 540px) {
+  #sectorBar { bottom: 44px; }
+  .sec-btn { font-size: 6.5px; padding: 4px 9px; letter-spacing: 1.4px; }
+}
 .scan-lock-splash {
   position: fixed;
   inset: 0;
@@ -1599,7 +1665,6 @@ body.pin-hover { cursor: crosshair; }
 </div>
 
 <!-- Data Ticker -->
-<div id="ticker"><span id="tickerTrack"></span></div>
 
 <div id="hint">Select a node to open city dossier</div>
 
@@ -2938,6 +3003,94 @@ function getCityHour(city) {
   return (d.getUTCHours() + Math.round(city.lon / 15) + 24) % 24;
 }
 
+// ═══════════════════════════════════════════════════
+//  SECTOR FILTER SYSTEM
+// ═══════════════════════════════════════════════════
+const SECTORS = [
+  { id:'finance',       label:'Finance',       kw:['Finance','Banking','FinTech','Private Banking','Islamic Finance','Insurance','Sovereign Wealth','Capital Markets','Derivatives','Stock Exchange'] },
+  { id:'technology',    label:'Technology',    kw:['Technology','IT Services','Cloud Computing','AI','Semiconductors','Electronics','Defense Tech','BPO','Gaming','Telecom','Cybersecurity','Software','Robotics'] },
+  { id:'manufacturing', label:'Manufacturing', kw:['Manufacturing','Automotive','Aerospace','Chemicals','Shipbuilding','Textiles','Garments','Steel','Hardware','Industrial'] },
+  { id:'real-estate',   label:'Real Estate',   kw:['Real Estate','Construction','Infrastructure'] },
+  { id:'energy',        label:'Energy',        kw:['Oil & Gas','Clean Energy','LNG','Renewable Energy','Energy','Renewables'] },
+  { id:'vc-startups',   label:'VC & Startups', kw:['Venture Capital','Startups','Innovation','Startup'] },
+  { id:'healthcare',    label:'Healthcare',    kw:['Pharma','Biotech','Healthcare','Life Sciences','Medical'] },
+  { id:'trade',         label:'Trade',         kw:['Logistics','Shipping','Trade','Agriculture','Commodities','Port & Logistics','Transportation','Supply Chain'] },
+  { id:'resources',     label:'Resources',     kw:['Mining','Resources','Gold','Copper','Phosphates','Cobalt','Lithium','Minerals','Aquaculture'] },
+  { id:'luxury',        label:'Luxury',        kw:['Luxury','Fashion','Design','Retail','Consumer Goods','Media','Entertainment','Film','Tourism'] },
+];
+
+// Precompute sector membership for each city
+CITIES.forEach(city => {
+  city._sectors = new Set();
+  city.industries.forEach(ind => {
+    SECTORS.forEach(sec => {
+      if (sec.kw.some(kw => ind.toLowerCase().includes(kw.toLowerCase()) || kw.toLowerCase().includes(ind.toLowerCase()))) {
+        city._sectors.add(sec.id);
+      }
+    });
+  });
+});
+
+// Filter state
+let   _activeSector = null;
+const _pinTgtScale  = new Float32Array(CITIES.length).fill(1.0);
+const _pinTgtAlpha  = new Float32Array(CITIES.length).fill(1.0);  // 1=full, 0=dim
+
+function setSectorFilter(sectorId) {
+  _activeSector = sectorId;
+  document.querySelectorAll('.sec-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.sector === (sectorId || ''));
+  });
+  CITIES.forEach((city, i) => {
+    const match = !sectorId || city._sectors.has(sectorId);
+    _pinTgtScale[i] = match ? 1.45 : 0.20;
+    _pinTgtAlpha[i] = match ? 1.0  : 0.0;
+  });
+  // Sync directory if open
+  syncDirToSector();
+}
+
+function syncDirToSector() {
+  document.querySelectorAll('#dirBody tr[data-idx]').forEach(tr => {
+    const i = parseInt(tr.dataset.idx);
+    if (!isNaN(i)) {
+      const show = !_activeSector || CITIES[i]._sectors.has(_activeSector);
+      tr.style.display = show ? '' : 'none';
+    }
+  });
+  const vis = document.querySelectorAll('#dirBody tr[data-idx]:not([style*="none"])').length;
+  const footer = document.getElementById('dirFooterCount');
+  if (footer) footer.textContent = `${vis} nodes${_activeSector ? ' matched' : ' active'}`;
+  const label = document.getElementById('dirCountLabel');
+  if (label) label.textContent = _activeSector ? `// ${vis} Nodes` : '// 100 Nodes';
+}
+
+function buildSectorBar() {
+  const bar    = document.createElement('div');  bar.id = 'sectorBar';
+  const scroll = document.createElement('div');  scroll.id = 'sectorScroll';
+
+  // ALL button
+  const allBtn = document.createElement('button');
+  allBtn.className   = 'sec-btn active';
+  allBtn.dataset.sector = '';
+  allBtn.textContent = 'ALL CITIES';
+  allBtn.onclick     = () => setSectorFilter(null);
+  scroll.appendChild(allBtn);
+
+  SECTORS.forEach(sec => {
+    const count = CITIES.filter(c => c._sectors.has(sec.id)).length;
+    const btn   = document.createElement('button');
+    btn.className      = 'sec-btn';
+    btn.dataset.sector = sec.id;
+    btn.innerHTML      = `${sec.label}<span class="sec-count">${count}</span>`;
+    btn.onclick        = () => setSectorFilter(_activeSector === sec.id ? null : sec.id);
+    scroll.appendChild(btn);
+  });
+
+  bar.appendChild(scroll);
+  document.body.appendChild(bar);
+}
+
 function computeNetworkStats() {
   const active = [], standby = [], offline = [];
   CITIES.forEach(city => {
@@ -3065,6 +3218,9 @@ CITIES.forEach((city, idx) => {
   G.add(ring);
   ringData.push({ mesh:ring, offset: idx*0.39, basePos:pos.clone(), dir:dir.clone() });
 });
+
+// Build sector filter bar (after CITIES + pins are ready)
+buildSectorBar();
 
 // ── Invisible hit spheres — larger radius on mobile for fat-finger tapping ──
 const hitMat   = new THREE.MeshBasicMaterial({ visible: false });
@@ -3571,7 +3727,7 @@ function runScanPaintAnimation() {
         _spNodes.textContent  = '100 / 100';
         _spHex.textContent    = '';
         _spStatus.style.color = '#00e676';
-        scrambleResolve(_spStatus, 'LOCK COMPLETE', 420);
+        scrambleResolve(_spStatus, 'ONLINE', 420);
 
         // ── Big centred lock splash ──
         const splash = document.createElement('div');
@@ -4033,7 +4189,7 @@ function closePanel() {
   _viewOffTarget = 0;
   selIdx = -1;
   clearCountryHighlight();
-  pinMeshes.forEach(p => { p.material.color.setHex(0xffffff); p.material.emissiveIntensity = 0.85; });
+  pinMeshes.forEach((p, i) => { p.material.color.setHex(0xffffff); p.material.emissiveIntensity = _pinTgtAlpha[i] > 0.5 ? 0.85 : 0.06; });
   refreshArcs(-1);
 }
 window.closePanel = closePanel;
@@ -4079,7 +4235,7 @@ function renderDirTable(filter) {
     return dirSortAsc ? va - vb : vb - va;
   });
   document.getElementById('dirBody').innerHTML = rows.map(c => `
-    <tr onclick="selectFromDirectory(${c.idx})">
+    <tr onclick="selectFromDirectory(${c.idx})" data-idx="${c.idx}">
       <td class="dir-node-id">NODE-${String(c.idx+1).padStart(3,'0')}</td>
       <td class="dir-city-name">${c.name}</td>
       <td>${c.country}</td>
@@ -4090,6 +4246,7 @@ function renderDirTable(filter) {
   const n = rows.length;
   document.getElementById('dirFooterCount').textContent = n === CITIES.length ? `${n} nodes active` : `${n} / ${CITIES.length} nodes`;
   document.getElementById('dirCountLabel').textContent = `// ${n} NODES`;
+  syncDirToSector();  // apply active sector filter to newly rendered rows
 }
 function selectFromDirectory(idx) {
   closeDirectory();
@@ -4332,7 +4489,7 @@ setInterval(tick, 1000); tick();
   const raw = segments.join('  ·  ');
   // Double the content so the loop is seamless
   const track = document.getElementById('tickerTrack');
-  track.textContent = raw + '  ·  ' + raw;
+  if (track) track.textContent = raw + '  ·  ' + raw;
 })();
 
 // ── Hex Overlay Canvas ──
@@ -4483,6 +4640,17 @@ const clock = new THREE.Clock();
       const pulse = 1.9 + 0.25 * Math.sin(t * 2.5);
       pin.scale.setScalar(pulse);
       pin.material.emissiveIntensity = 5.5 + 1.8 * Math.sin(t * 2.5);
+    } else {
+      // Sector filter — lerp scale and emissive toward targets
+      const ts = _pinTgtScale[i];
+      const cs = pin.scale.x;
+      pin.scale.setScalar(cs + (ts - cs) * 0.10);
+      const te = _pinTgtAlpha[i] > 0.5 ? 0.85 : 0.06;
+      pin.material.emissiveIntensity += (te - pin.material.emissiveIntensity) * 0.10;
+      // Dim ring for unmatched pins
+      ringData[i].mesh.material.opacity = _pinTgtAlpha[i] > 0.5
+        ? 0.25 * (1 - (ringData[i].mesh.scale.x - 1) / 0.55)
+        : 0;
     }
   });
 

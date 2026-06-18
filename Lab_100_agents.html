@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Lab 100 Inc. — Global Agent Network</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:           #000000;
+  --surface:      rgba(0, 8, 22, 0.97);
+  --cyan:         #00c8ff;
+  --cyan-dim:     rgba(0, 200, 255, 0.18);
+  --cyan-faint:   rgba(0, 200, 255, 0.05);
+  --white:        #ffffff;
+  --white-60:     rgba(255,255,255,0.6);
+  --white-30:     rgba(255,255,255,0.28);
+  --white-10:     rgba(255,255,255,0.07);
+  --border:       rgba(0, 200, 255, 0.14);
+  --border-light: rgba(0, 200, 255, 0.3);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: radial-gradient(ellipse at 50% 52%, #010d1e 0%, #000000 58%);
+  color: var(--white-60);
+  font-family: 'Inter', system-ui, sans-serif;
+  overflow: hidden;
+  height: 100vh; width: 100vw;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+canvas {
+  display: block;
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 0;
+}
+
+/* ── ORBIT RINGS — tilted into 3D orbital planes ── */
+/* ── NAV RINGS — gimbal rings that track globe orientation ── */
+.nav-ring {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 2;
+  top: 50%;
+}
+#ringH {
+  /* Horizontal / equatorial ring */
+  border: 1px solid rgba(0,200,255,0.22);
+  box-shadow: 0 0 12px rgba(0,200,255,0.06), inset 0 0 20px rgba(0,200,255,0.02);
+}
+#ringV {
+  /* Vertical / meridional ring */
+  border: 1px solid rgba(0,200,255,0.16);
+  box-shadow: 0 0 8px rgba(0,200,255,0.04);
+}
+/* Cardinal tick arm — rotates around ring center at --a degrees */
+.ring-tick-arm {
+  position: absolute;
+  width: 100%; height: 100%;
+  top: 0; left: 0;
+  transform: rotate(var(--a));
+}
+/* Tick mark at 12 o'clock of each arm */
+.ring-tick {
+  position: absolute;
+  top: -3px; left: 50%;
+  width: 1px; height: 6px;
+  margin-left: -0.5px;
+  background: rgba(0,200,255,0.38);
+}
+/* Navigation node arm — angle driven by JS */
+.ring-node-arm {
+  position: absolute;
+  width: 100%; height: 100%;
+  top: 0; left: 0;
+}
+/* Glowing node at 12 o'clock of the arm */
+.ring-node {
+  position: absolute;
+  top: -5px; left: 50%;
+  transform: translateX(-50%);
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #00c8ff;
+  box-shadow: 0 0 8px rgba(0,200,255,1), 0 0 18px rgba(0,200,255,0.55), 0 0 30px rgba(0,200,255,0.20);
+}
+/* Bracket arms flanking the node — targeting sight detail */
+.ring-node::before,
+.ring-node::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 7px; height: 1px;
+  background: rgba(0,200,255,0.65);
+  transform: translateY(-50%);
+}
+.ring-node::before { right: 100%; margin-right: 3px; }
+.ring-node::after  { left:  100%; margin-left:  3px; }
+
+/* ── DIRECTORY BUTTON (header) ── */
+.dir-nav-btn {
+  background: transparent;
+  border: 1px solid rgba(0,200,255,0.28);
+  color: rgba(255,255,255,0.58);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px;
+  letter-spacing: 2px;
+  padding: 6px 13px;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.18s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.dir-nav-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* ── DIRECTORY OVERLAY ── */
+#directoryPanel {
+  position: fixed; inset: 0;
+  background: rgba(0,2,6,0.92);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  z-index: 110;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.28s;
+}
+#directoryPanel.open { opacity: 1; pointer-events: all; }
+.dir-inner {
+  width: min(1060px, 96vw);
+  max-height: 84vh;
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border-light);
+  background: rgba(0,0,0,0.55);
+}
+.dir-hdr {
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px 22px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.dir-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; letter-spacing: 3px; color: var(--white);
+  text-transform: uppercase; margin-right: auto;
+}
+.dir-title span { color: var(--cyan); margin-left: 12px; opacity: 0.65; }
+.dir-search {
+  background: transparent; border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--white); font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; letter-spacing: 1.5px;
+  padding: 4px 6px; width: 180px; outline: none;
+  text-transform: uppercase;
+}
+.dir-search::placeholder { color: var(--white-30); letter-spacing: 1px; }
+.dir-close-btn {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--white-30); font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; padding: 5px 10px; cursor: pointer;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.dir-close-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+.dir-table-wrap { overflow-y: auto; flex: 1; }
+.dir-table-wrap::-webkit-scrollbar { width: 2px; }
+.dir-table-wrap::-webkit-scrollbar-thumb { background: var(--border); }
+#dirTable { width: 100%; border-collapse: collapse; font-family: 'IBM Plex Mono', monospace; font-size: 10px; }
+#dirTable thead th {
+  text-align: left; padding: 10px 16px;
+  font-size: 8px; letter-spacing: 2px; color: var(--white-30);
+  border-bottom: 1px solid var(--border); cursor: pointer;
+  user-select: none; white-space: nowrap;
+  position: sticky; top: 0; background: rgba(0,0,0,0.95);
+  transition: color 0.15s;
+}
+#dirTable thead th:hover { color: var(--cyan); }
+#dirTable thead th.dir-sorted { color: var(--cyan); }
+#dirTable tbody tr {
+  border-bottom: 1px solid rgba(0,200,255,0.05);
+  cursor: pointer; transition: background 0.12s;
+}
+#dirTable tbody tr:hover { background: rgba(0,200,255,0.07); }
+#dirTable tbody td { padding: 9px 16px; color: var(--white-30); letter-spacing: 0.5px; }
+.dir-node-id { color: rgba(0,200,255,0.45); font-size: 9px; }
+.dir-agent-name { color: var(--white); font-size: 11px; letter-spacing: 1px; }
+.dir-badge {
+  display: inline-block; padding: 2px 7px;
+  border: 1px solid var(--border); font-size: 8px; color: var(--cyan); letter-spacing: 1px;
+}
+.dir-footer {
+  padding: 9px 22px; border-top: 1px solid var(--border);
+  font-size: 9px; color: var(--white-30); letter-spacing: 0.5px;
+}
+
+/* ── RETICLE ── */
+#reticleEl {
+  position: fixed;
+  width: 24px; height: 24px;
+  z-index: 30;
+  pointer-events: none;
+  opacity: 0; transition: opacity 0.2s;
+}
+#reticleEl.show { opacity: 0.6; }
+#reticleEl.selected { opacity: 1; }
+#reticleEl::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(0,200,255,0.7);
+  border-radius: 50%;
+}
+#reticleEl::after {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border: 1px solid rgba(0,200,255,0.4);
+  border-radius: 50%;
+}
+
+/* ── TOOLTIP (agent card) ── */
+#tooltip {
+  position: fixed;
+  background: rgba(0,10,25,0.95);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  padding: 12px 16px;
+  font-size: 10px;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0; transition: opacity 0.2s;
+  font-family: 'IBM Plex Mono', monospace;
+  white-space: nowrap;
+  backdrop-filter: blur(12px);
+}
+#tooltip.show { opacity: 1; }
+#tAgentName {
+  color: var(--cyan);
+  font-weight: 600;
+  margin-bottom: 4px;
+  letter-spacing: 1px;
+}
+#tLocation {
+  color: var(--white-60);
+  font-size: 9px;
+  margin-bottom: 6px;
+}
+#tExpertise {
+  color: var(--white-30);
+  font-size: 8px;
+  letter-spacing: 0.5px;
+}
+
+/* ── HEADER — position labels ── */
+#header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 20;
+  padding: 16px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.4), rgba(0,0,0,0));
+}
+#headerTitle {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--white);
+  text-transform: uppercase;
+}
+#headerCoords {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--white-30);
+}
+#headerCoords span { color: var(--cyan); margin: 0 4px; }
+
+.dir-nav-btn { pointer-events: all; }
+
+/* ── HUD (lower left) ── */
+#hud {
+  position: fixed;
+  bottom: 22px; left: 22px;
+  font-family: 'IBM Plex Mono', monospace;
+  z-index: 20;
+}
+.hud-row {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 8px;
+  font-size: 8px;
+}
+.hud-axis {
+  width: 60px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hud-axis-label { color: var(--white-30); width: 18px; }
+.hud-axis-bar {
+  flex: 1;
+  height: 18px;
+  background: rgba(0,200,255,0.08);
+  border: 1px solid rgba(0,200,255,0.18);
+  position: relative;
+  overflow: hidden;
+}
+.hud-axis-fill {
+  position: absolute;
+  left: 0; top: 0; height: 100%;
+  background: linear-gradient(90deg, rgba(0,200,255,0.3), rgba(0,200,255,0.6));
+  width: 0%;
+}
+.hud-axis-dot {
+  position: absolute;
+  top: 0; left: 0;
+  width: 2px; height: 100%;
+  background: var(--cyan);
+}
+.hud-axis-value {
+  color: var(--cyan);
+  width: 32px;
+  text-align: right;
+}
+
+/* ── MOBILE RESPONSIVE ── */
+@media (max-width: 768px) {
+  #header { padding: 12px 16px; }
+  #headerTitle { font-size: 8px; }
+  #hud { bottom: 12px; left: 12px; font-size: 7px; }
+  .hud-row { gap: 16px; margin-bottom: 6px; }
+  .hud-axis { width: 50px; }
+  .dir-search { width: 120px; }
+}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div id="headerTitle">LAB 100 — GLOBAL AGENT NETWORK</div>
+  <div id="headerCoords">
+    <span id="hLat">LAT</span>
+    <span id="hLon">LON</span>
+  </div>
+  <button class="dir-nav-btn">DIRECTORY</button>
+</div>
+
+<div id="reticleEl"></div>
+<div id="reticleLabel"></div>
+
+<div id="tooltip">
+  <div id="tAgentName"></div>
+  <div id="tLocation"></div>
+  <div id="tExpertise"></div>
+</div>
+
+<div id="hud">
+  <div class="hud-row">
+    <div class="hud-axis">
+      <span class="hud-axis-label">PITCH</span>
+      <div class="hud-axis-bar">
+        <div class="hud-axis-fill" id="ohudPFill"></div>
+        <div class="hud-axis-dot" id="ohudPDot"></div>
+      </div>
+      <div class="hud-axis-value" id="ohudPVal">0°</div>
+    </div>
+  </div>
+  <div class="hud-row">
+    <div class="hud-axis">
+      <span class="hud-axis-label">YAW</span>
+      <div class="hud-axis-bar">
+        <div class="hud-axis-fill" id="ohudYFill"></div>
+        <div class="hud-axis-dot" id="ohudYDot"></div>
+      </div>
+      <div class="hud-axis-value" id="ohudYVal">0°</div>
+    </div>
+  </div>
+</div>
+
+<div id="directoryPanel">
+  <div class="dir-inner">
+    <div class="dir-hdr">
+      <div class="dir-title">AGENT DIRECTORY <span id="dirCount"></span></div>
+      <input type="text" class="dir-search" id="dirSearch" placeholder="SEARCH AGENTS...">
+      <button class="dir-close-btn">CLOSE</button>
+    </div>
+    <div class="dir-table-wrap">
+      <table id="dirTable">
+        <thead>
+          <tr>
+            <th>AGENT</th>
+            <th>LOCATION</th>
+            <th>EXPERTISE</th>
+            <th>DEALS</th>
+            <th>LANGUAGES</th>
+          </tr>
+        </thead>
+        <tbody id="dirTableBody"></tbody>
+      </table>
+    </div>
+    <div class="dir-footer">Use search to filter agents. Click any agent to navigate the globe.</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@r128/examples/js/curves/CatmullRomCurve3.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════
+// AGENT DATA (100 sample agents)
+// Replace with real agent data
+// ═══════════════════════════════════════════════════
+const AGENTS = [
+  { id: 1, name: 'Sarah Chen', location: 'Singapore', lat: 1.35, lon: 103.82, expertise: 'Tech Sales', deals: 23, languages: ['EN', 'Mandarin', 'Cantonese'] },
+  { id: 2, name: 'Marcus Johnson', location: 'New York', lat: 40.71, lon: -74.01, expertise: 'Enterprise B2B', deals: 31, languages: ['EN', 'Spanish'] },
+  { id: 3, name: 'Emma Müller', location: 'Berlin', lat: 52.52, lon: 13.40, expertise: 'SaaS Partnerships', deals: 18, languages: ['EN', 'German', 'French'] },
+  { id: 4, name: 'Rajesh Patel', location: 'Mumbai', lat: 19.08, lon: 72.88, expertise: 'Channel Distribution', deals: 27, languages: ['EN', 'Hindi', 'Gujarati'] },
+  { id: 5, name: 'Yuki Tanaka', location: 'Tokyo', lat: 35.68, lon: 139.69, expertise: 'Tech Integration', deals: 14, languages: ['EN', 'Japanese'] },
+  { id: 6, name: 'Lucia Rossi', location: 'Milan', lat: 45.46, lon: 9.19, expertise: 'Luxury Goods', deals: 12, languages: ['EN', 'Italian', 'German'] },
+  { id: 7, name: 'James MacLeod', location: 'London', lat: 51.51, lon: -0.13, expertise: 'Financial Services', deals: 28, languages: ['EN', 'French'] },
+  { id: 8, name: 'Ana Silva', location: 'São Paulo', lat: -23.55, lon: -46.63, expertise: 'Agritech', deals: 16, languages: ['EN', 'Portuguese', 'Spanish'] },
+  { id: 9, name: 'Fatima Al-Rashid', location: 'Dubai', lat: 25.27, lon: 55.31, expertise: 'Middle East Trade', deals: 19, languages: ['EN', 'Arabic', 'Urdu'] },
+  { id: 10, name: 'David Kim', location: 'Seoul', lat: 37.57, lon: 126.98, expertise: 'Consumer Electronics', deals: 24, languages: ['EN', 'Korean', 'Mandarin'] },
+  { id: 11, name: 'Sophie Dubois', location: 'Paris', lat: 48.86, lon: 2.35, expertise: 'Luxury Partnerships', deals: 15, languages: ['EN', 'French', 'German'] },
+  { id: 12, name: 'Ahmed Hassan', location: 'Cairo', lat: 30.04, lon: 31.24, expertise: 'African Expansion', deals: 11, languages: ['EN', 'Arabic'] },
+  { id: 13, name: 'Isabella Garcia', location: 'Madrid', lat: 40.42, lon: -3.70, expertise: 'European Sales', deals: 20, languages: ['EN', 'Spanish', 'French'] },
+  { id: 14, name: 'Chen Wei', location: 'Shanghai', lat: 31.23, lon: 121.47, expertise: 'Manufacturing', deals: 26, languages: ['EN', 'Mandarin', 'Shanghainese'] },
+  { id: 15, name: 'Hans Mueller', location: 'Frankfurt', lat: 50.11, lon: 8.68, expertise: 'Financial Tech', deals: 22, languages: ['EN', 'German', 'Dutch'] },
+  { id: 16, name: 'Priya Sharma', location: 'Bangalore', lat: 12.97, lon: 77.59, expertise: 'Software Services', deals: 17, languages: ['EN', 'Hindi', 'Kannada'] },
+  { id: 17, name: 'Carlos Mendez', location: 'Mexico City', lat: 19.43, lon: -99.13, expertise: 'LATAM Channels', deals: 13, languages: ['EN', 'Spanish'] },
+  { id: 18, name: 'Ngozi Okafor', location: 'Lagos', lat: 6.52, lon: 3.36, expertise: 'African Markets', deals: 9, languages: ['EN', 'Yoruba', 'Igbo'] },
+  { id: 19, name: 'Viktor Petrov', location: 'Moscow', lat: 55.75, lon: 37.62, expertise: 'CIS Markets', deals: 14, languages: ['EN', 'Russian'] },
+  { id: 20, name: 'Linda Wong', location: 'Hong Kong', lat: 22.30, lon: 114.18, expertise: 'Asia-Pacific', deals: 25, languages: ['EN', 'Cantonese', 'Mandarin'] },
+  { id: 21, name: 'Thomas Anderson', location: 'San Francisco', lat: 37.77, lon: -122.41, expertise: 'Tech Startups', deals: 29, languages: ['EN', 'French'] },
+  { id: 22, name: 'Svetlana Volkov', location: 'St. Petersburg', lat: 59.93, lon: 30.36, expertise: 'European Tech', deals: 10, languages: ['EN', 'Russian'] },
+  { id: 23, name: 'Marco Bianchi', location: 'Rome', lat: 41.90, lon: 12.50, expertise: 'Corporate Sales', deals: 11, languages: ['EN', 'Italian', 'German'] },
+  { id: 24, name: 'Amara Okonkwo', location: 'Accra', lat: 5.60, lon: -0.17, expertise: 'West Africa', deals: 8, languages: ['EN', 'Twi'] },
+  { id: 25, name: 'Michael O'Brien', location: 'Dublin', lat: 53.35, lon: -6.26, expertise: 'Tech Hubs', deals: 16, languages: ['EN', 'Irish'] },
+];
+
+// Populate the rest to 100 (simplified for demo)
+for (let i = AGENTS.length; i < 100; i++) {
+  const randomLat = (Math.random() - 0.5) * 180;
+  const randomLon = (Math.random() - 0.5) * 360;
+  const regions = ['North America', 'South America', 'Europe', 'Africa', 'Asia', 'Oceania'];
+  const expertises = ['Tech Sales', 'Enterprise B2B', 'Channel Distribution', 'Partnerships', 'Distribution'];
+  const cities = ['Toronto', 'Sydney', 'Bangkok', 'Istanbul', 'Nairobi', 'Stockholm', 'Amsterdam', 'Helsinki', 'Warsaw', 'Prague'];
+  
+  AGENTS.push({
+    id: i + 1,
+    name: `Agent ${i + 1}`,
+    location: cities[Math.floor(Math.random() * cities.length)],
+    lat: randomLat,
+    lon: randomLon,
+    expertise: expertises[Math.floor(Math.random() * expertises.length)],
+    deals: Math.floor(Math.random() * 30) + 5,
+    languages: ['EN', 'Local']
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// THREE.JS SETUP
+// ═══════════════════════════════════════════════════
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 10000);
+camera.position.z = 2.3;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setClearColor(0x000000, 0);
+document.body.appendChild(renderer.domElement);
+
+const GLOBE_R = 1;
+const G = new THREE.Group();
+scene.add(G);
+
+// Globe geometry
+const globeGeom = new THREE.IcosahedronGeometry(GLOBE_R, 64);
+const globeMat = new THREE.MeshPhongMaterial({
+  color: 0x001a33,
+  emissive: 0x000a1a,
+  shininess: 5,
+  side: THREE.FrontSide
+});
+const globe = new THREE.Mesh(globeGeom, globeMat);
+G.add(globe);
+
+// Atmosphere layers
+const atmoRim = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(GLOBE_R * 1.06, 32),
+  new THREE.MeshBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: 0.02, side: THREE.BackSide })
+);
+G.add(atmoRim);
+
+const atmoInner = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(GLOBE_R * 1.04, 32),
+  new THREE.MeshBasicMaterial({ color: 0x0066cc, transparent: true, opacity: 0.15, side: THREE.BackSide })
+);
+G.add(atmoInner);
+
+const atmoMid = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(GLOBE_R * 1.02, 32),
+  new THREE.MeshBasicMaterial({ color: 0x0088ff, transparent: true, opacity: 0.10, side: THREE.BackSide })
+);
+G.add(atmoMid);
+
+// Lighting
+const light = new THREE.DirectionalLight(0xffffff, 0.4);
+light.position.set(2, 1.5, 2);
+scene.add(light);
+scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+
+// ═══════════════════════════════════════════════════
+// AGENT PINS & RINGS
+// ═══════════════════════════════════════════════════
+const pinMeshes = [];
+const ringData = [];
+const hitMeshes = [];
+
+AGENTS.forEach((agent, i) => {
+  const lat = agent.lat * Math.PI / 180;
+  const lon = agent.lon * Math.PI / 180;
+  
+  const x = GLOBE_R * Math.cos(lat) * Math.cos(lon);
+  const y = GLOBE_R * Math.sin(lat);
+  const z = GLOBE_R * Math.cos(lat) * Math.sin(lon);
+  
+  const dir = new THREE.Vector3(x, y, z).normalize();
+  const basePos = dir.clone().multiplyScalar(GLOBE_R + 0.05);
+  
+  // Pin mesh
+  const pinGeom = new THREE.SphereGeometry(0.015, 8, 8);
+  const pinMat = new THREE.MeshBasicMaterial({ color: 0x00c8ff, emissive: 0x00c8ff });
+  const pin = new THREE.Mesh(pinGeom, pinMat);
+  pin.position.copy(basePos);
+  G.add(pin);
+  pinMeshes.push(pin);
+  
+  // Hit mesh for raycasting
+  const hitGeom = new THREE.SphereGeometry(0.08, 4, 4);
+  const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
+  const hit = new THREE.Mesh(hitGeom, hitMat);
+  hit.position.copy(basePos);
+  G.add(hit);
+  hitMeshes.push(hit);
+  
+  // Ring mesh
+  const ringGeom = new THREE.RingGeometry(0.055, 0.065, 32);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0x00c8ff,
+    transparent: true,
+    opacity: 0.25,
+    side: THREE.DoubleSide
+  });
+  const ring = new THREE.Mesh(ringGeom, ringMat);
+  ring.position.copy(basePos);
+  ring.lookAt(basePos.clone().add(dir));
+  G.add(ring);
+  
+  ringData.push({
+    basePos: basePos.clone(),
+    dir: dir.clone(),
+    offset: Math.random() * Math.PI * 2,
+    mesh: ring,
+    agent: agent
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// AGENT CONNECTIONS (sample network lines)
+// ═══════════════════════════════════════════════════
+const connectionMeshes = [];
+for (let i = 0; i < Math.min(AGENTS.length, 30); i++) {
+  const agent1 = ringData[i];
+  const agent2Idx = Math.floor(Math.random() * AGENTS.length);
+  const agent2 = ringData[agent2Idx];
+  
+  if (agent1.basePos.distanceTo(agent2.basePos) < 2.5) continue;
+  
+  const curve = new THREE.CatmullRomCurve3([
+    agent1.basePos.clone(),
+    agent1.basePos.clone().lerp(agent2.basePos, 0.33).add(agent1.dir.clone().multiplyScalar(0.3)),
+    agent2.basePos.clone().lerp(agent1.basePos, 0.33).add(agent2.dir.clone().multiplyScalar(0.3)),
+    agent2.basePos.clone()
+  ]);
+  
+  const points = curve.getPoints(40);
+  const geom = new THREE.BufferGeometry().setFromPoints(points);
+  const mat = new THREE.LineBasicMaterial({ color: 0x00c8ff, transparent: true, opacity: 0.12, linewidth: 0.5 });
+  const line = new THREE.Line(geom, mat);
+  G.add(line);
+  connectionMeshes.push(line);
+}
+
+// ═══════════════════════════════════════════════════
+// INTERACTION
+// ═══════════════════════════════════════════════════
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let selIdx = -1;
+let hoverIdx = -1;
+let isDragging = false;
+let velX = 0, velY = 0;
+let gotoTarget = null;
+const DECAY = 0.96;
+const RESUME = 0.0012;
+const AUTO_SPD = 0.0008;
+
+window.addEventListener('mousemove', (e) => {
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  
+  if (!isDragging) {
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(hitMeshes);
+    hoverIdx = intersects.length > 0 ? hitMeshes.indexOf(intersects[0].object) : -1;
+  }
+});
+
+window.addEventListener('mousedown', (e) => {
+  isDragging = true;
+  window._dragStartX = e.clientX;
+  window._dragStartY = e.clientY;
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (isDragging && window._dragStartX !== undefined) {
+    const dx = (e.clientX - window._dragStartX) * 0.005;
+    const dy = (e.clientY - window._dragStartY) * 0.005;
+    velY = dx;
+    velX = dy;
+    window._dragStartX = e.clientX;
+    window._dragStartY = e.clientY;
+  }
+});
+
+window.addEventListener('mouseup', () => {
+  isDragging = false;
+});
+
+window.addEventListener('click', (e) => {
+  if (hoverIdx >= 0) {
+    selIdx = selIdx === hoverIdx ? -1 : hoverIdx;
+    gotoTarget = null;
+  }
+});
+
+// Directory panel
+const dirBtn = document.querySelector('.dir-nav-btn');
+const dirPanel = document.getElementById('directoryPanel');
+const dirCloseBtn = document.querySelector('.dir-close-btn');
+const dirSearch = document.getElementById('dirSearch');
+
+dirBtn.addEventListener('click', () => {
+  dirPanel.classList.add('open');
+  populateDirectory();
+});
+
+dirCloseBtn.addEventListener('click', () => {
+  dirPanel.classList.remove('open');
+});
+
+function populateDirectory() {
+  const body = document.getElementById('dirTableBody');
+  body.innerHTML = '';
+  const filtered = AGENTS.filter(a => a.name.toLowerCase().includes(dirSearch.value.toLowerCase()));
+  
+  filtered.forEach((agent, idx) => {
+    const row = document.createElement('tr');
+    const actualIdx = AGENTS.indexOf(agent);
+    row.innerHTML = `
+      <td><span class="dir-node-id">#${agent.id}</span></td>
+      <td><span class="dir-agent-name">${agent.name}</span></td>
+      <td>${agent.location}</td>
+      <td>${agent.expertise}</td>
+      <td>${agent.deals}</td>
+      <td>${agent.languages.join(' • ')}</td>
+    `;
+    row.addEventListener('click', () => {
+      selIdx = actualIdx;
+      gotoTarget = {
+        x: -ringData[actualIdx].basePos.y / GLOBE_R * 0.8,
+        y: Math.atan2(ringData[actualIdx].basePos.z, -ringData[actualIdx].basePos.x)
+      };
+      dirPanel.classList.remove('open');
+    });
+    body.appendChild(row);
+  });
+  document.getElementById('dirCount').textContent = `(${filtered.length})`;
+}
+
+dirSearch.addEventListener('input', populateDirectory);
+
+// ═══════════════════════════════════════════════════
+// RENDER LOOP
+// ═══════════════════════════════════════════════════
+const clock = new THREE.Clock();
+
+function updateAgentHoverCard() {
+  const reticle = document.getElementById('reticleEl');
+  const tooltip = document.getElementById('tooltip');
+  
+  const _reticleIdx = selIdx >= 0 ? selIdx : hoverIdx;
+  if (_reticleIdx >= 0) {
+    const pos = hitMeshes[_reticleIdx].position;
+    const screenPos = pos.clone().project(camera);
+    const rx = (screenPos.x + 1) / 2 * window.innerWidth;
+    const ry = -(screenPos.y - 1) / 2 * window.innerHeight;
+    
+    reticle.style.left = rx + 'px';
+    reticle.style.top = ry + 'px';
+    
+    const agent = AGENTS[_reticleIdx];
+    if (selIdx >= 0) {
+      reticle.className = 'selected';
+      document.getElementById('tAgentName').textContent = agent.name;
+      document.getElementById('tLocation').textContent = agent.location;
+      document.getElementById('tExpertise').textContent = agent.expertise + ' • ' + agent.deals + ' deals';
+      tooltip.style.left = (rx + 16) + 'px';
+      tooltip.style.top = (ry - 4) + 'px';
+      tooltip.classList.add('show');
+    } else {
+      reticle.className = 'show';
+    }
+  } else {
+    reticle.className = '';
+    tooltip.classList.remove('show');
+  }
+}
+
+(function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  
+  if (isDragging) {
+    gotoTarget = null;
+  } else if (gotoTarget) {
+    const _dy = gotoTarget.y - G.rotation.y;
+    const _dx = gotoTarget.x - G.rotation.x;
+    G.rotation.y += _dy * 0.10;
+    G.rotation.x += _dx * 0.10;
+    G.rotation.x = Math.max(-Math.PI / 2.8, Math.min(Math.PI / 2.8, G.rotation.x));
+    if (Math.abs(_dy) < 0.008 && Math.abs(_dx) < 0.008) {
+      G.rotation.y = gotoTarget.y;
+      G.rotation.x = gotoTarget.x;
+      gotoTarget = null; velX = 0; velY = 0;
+    }
+  } else {
+    G.rotation.y += velY;
+    G.rotation.x += velX;
+    G.rotation.x = Math.max(-Math.PI / 2.8, Math.min(Math.PI / 2.8, G.rotation.x));
+    velX *= DECAY;
+    velY *= DECAY;
+    
+    if (Math.abs(velX) < RESUME && Math.abs(velY) < RESUME) {
+      G.rotation.y += AUTO_SPD;
+    }
+  }
+  
+  // Atmosphere breathing
+  atmoRim.material.opacity = 0.022 + 0.008 * Math.sin(t * 0.55);
+  atmoInner.material.opacity = 0.170 + 0.050 * Math.sin(t * 0.42 + 1.1);
+  atmoMid.material.opacity = 0.115 + 0.030 * Math.sin(t * 0.31 + 2.3);
+  
+  // Pin animations
+  pinMeshes.forEach((pin, i) => {
+    const rd = ringData[i];
+    const bob = Math.sin(t * 1.5 + rd.offset) * 0.01;
+    pin.position.copy(rd.basePos.clone().add(rd.dir.clone().multiplyScalar(0.05 + bob)));
+    
+    if (i === selIdx) {
+      const pulse = 1.9 + 0.25 * Math.sin(t * 2.5);
+      pin.scale.setScalar(pulse);
+      pin.material.emissiveIntensity = 5.5 + 1.8 * Math.sin(t * 2.5);
+    } else {
+      pin.scale.setScalar(1);
+      pin.material.emissiveIntensity = 1;
+    }
+  });
+  
+  // Ring breathing
+  ringData.forEach(rd => {
+    const s = 1 + 0.55 * Math.sin(t * 1.5 + rd.offset);
+    rd.mesh.scale.setScalar(s);
+    rd.mesh.material.opacity = 0.25 * (1 - (s - 1) / 0.55);
+  });
+  
+  // Coordinates
+  const _frontPt = new THREE.Vector3(0, 0, GLOBE_R);
+  const localFront = G.worldToLocal(_frontPt.clone()).normalize();
+  const _lat = Math.asin(Math.max(-1, Math.min(1, localFront.y))) * 180 / Math.PI;
+  let _theta = Math.atan2(localFront.z, -localFront.x);
+  if (_theta < 0) _theta += 2 * Math.PI;
+  const _lon = _theta * 180 / Math.PI - 180;
+  
+  document.getElementById('hLat').textContent = (_lat >= 0 ? _lat.toFixed(1) + '° N' : Math.abs(_lat).toFixed(1) + '° S');
+  document.getElementById('hLon').textContent = (_lon >= 0 ? _lon.toFixed(1) + '° E' : Math.abs(_lon).toFixed(1) + '° W');
+  
+  // HUD orientation
+  const _pitchRad = G.rotation.x;
+  const _yawRad = G.rotation.y;
+  const _pitchMax = Math.PI / 2.8;
+  const _pn = Math.min(1, Math.max(0, (_pitchRad + _pitchMax) / (2 * _pitchMax)));
+  const _yn = ((_yawRad % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI) / (2 * Math.PI);
+  
+  document.getElementById('ohudPDot').style.top = (_pn * 100).toFixed(1) + '%';
+  document.getElementById('ohudYDot').style.top = (_yn * 100).toFixed(1) + '%';
+  document.getElementById('ohudPFill').style.height = (_pn * 100).toFixed(1) + '%';
+  document.getElementById('ohudYFill').style.height = (_yn * 100).toFixed(1) + '%';
+  
+  const _pd = (_pitchRad * 180 / Math.PI);
+  const _yd = ((_yawRad * 180 / Math.PI) % 360);
+  document.getElementById('ohudPVal').textContent = (_pd >= 0 ? '+' : '') + _pd.toFixed(0) + '°';
+  document.getElementById('ohudYVal').textContent = (_yd >= 0 ? '+' : '') + _yd.toFixed(0) + '°';
+  
+  updateAgentHoverCard();
+  renderer.render(scene, camera);
+})();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
